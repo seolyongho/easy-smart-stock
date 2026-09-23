@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Easy Smart Stock - 스케줄러 버그 픽스 최종 v58</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-slate-900">
+
+    <!-- 로그인 화면 -->
+    <div id="loginScreen" class="flex flex-col items-center justify-center min-h-screen px-6 py-12 bg-slate-950 hidden">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-800">
+            <div class="text-center mb-6 mt-2">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600 text-white text-3xl mb-3 shadow-lg shadow-indigo-600/30">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">Easy Smart Stock</h1>
+                <p class="text-slate-500 text-xs mt-1">소상공인 맞춤형 스케줄 & 재고 통합 ERP</p>
+            </div>
+
+            <div class="flex rounded-2xl bg-slate-100 p-1 mb-6">
+                <button type="button" id="tabOwner" onclick="switchLoginRole('owner')" class="flex-1 py-3 text-xs font-bold rounded-xl bg-white text-indigo-600 shadow-sm transition">
+                    가맹점 / 사장님
+                </button>
+                <button type="button" id="tabStaff" onclick="switchLoginRole('staff')" class="flex-1 py-3 text-xs font-bold rounded-xl text-slate-500 transition">
+                    알바생(직원)
+                </button>
+                <button type="button" id="tabAdmin" onclick="switchLoginRole('admin')" class="flex-1 py-3 text-xs font-bold rounded-xl text-slate-500 transition">
+                    총괄 본사
+                </button>
+            </div>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">아이디</label>
+                    <input type="text" id="loginEmail" required class="w-full border border-slate-200 rounded-2xl p-3.5 text-sm focus:border-indigo-600 focus:outline-none bg-slate-50/50" placeholder="아이디 입력">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">비밀번호</label>
+                    <input type="password" id="loginPw" required class="w-full border border-slate-200 rounded-2xl p-3.5 text-sm focus:border-indigo-600 focus:outline-none bg-slate-50/50" placeholder="비밀번호 입력">
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="rememberMe" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" checked>
+                        <label for="rememberMe" class="ml-2 text-xs text-slate-600 font-semibold cursor-pointer">로그인 유지</label>
+                    </div>
+                    <button type="button" onclick="openFindAccountModal()" class="text-[11px] text-indigo-600 font-bold hover:underline">아이디/비밀번호 찾기</button>
+                </div>
+                <button type="submit" id="loginSubmitBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition shadow-xl shadow-indigo-600/25">
+                    로그인하기
+                </button>
+            </form>
+
+            <div id="signupPrompt" class="mt-6 text-center space-y-2">
+                <div>
+                    <span class="text-xs text-slate-500">사장님이신가요?</span>
+                    <button type="button" onclick="openSignupModal()" class="text-xs font-bold text-indigo-600 ml-2 hover:underline">가맹점 회원가입</button>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-500">알바생이신가요?</span>
+                    <button type="button" onclick="openStaffSignupModal()" class="text-xs font-bold text-emerald-600 ml-2 hover:underline">알바생 회원가입</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 모달 컨테이너 (중복 없는 유일한 모달들) -->
+    
+    <!-- 계정 찾기 모달 -->
+    <div id="findAccountModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-magnifying-glass mr-2 text-indigo-600"></i>계정 찾기</h3>
+                <button onclick="closeFindAccountModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <form onsubmit="findAccount(event)" class="space-y-3">
+                <select id="findRole" class="w-full border rounded-xl p-3 text-sm focus:outline-none">
+                    <option value="owner">사장님(가맹점) 계정</option>
+                    <option value="staff">알바생(직원) 계정</option>
+                </select>
+                <input type="text" id="findName" required class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="이름 (대표자명 또는 직원명)">
+                <input type="tel" id="findPhone" required class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="전화번호 (예: 010-0000-0000)">
+                <input type="text" id="findBirth" required maxlength="8" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="생년월일 8자리 (예: 19900101)">
+                <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow transition">계정 정보 조회</button>
+            </form>
+            <div id="findResult" class="text-center bg-slate-50 p-4 rounded-xl min-h-[70px] flex items-center justify-center border border-slate-100">
+                <span class="text-xs text-slate-400">가입 시 입력한 정보를 바탕으로 조회합니다.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 사장님 회원가입 모달 -->
+    <div id="signupModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
+            <div class="bg-indigo-600 p-6 flex justify-between items-center text-white shrink-0">
+                <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-plus mr-2"></i>가맹점 회원가입</h3>
+                <button onclick="closeSignupModal()" class="text-indigo-200 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <form onsubmit="handleSignup(event)" class="p-6 space-y-4 overflow-y-auto no-scrollbar">
+                <div><label class="block text-xs font-semibold mb-1">상호명</label><input type="text" id="signupName" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
+                <div>
+                    <label class="block text-xs font-semibold mb-1">업종 선택 (200+ 업종)</label>
+                    <select id="signupBusinessType" class="w-full border rounded-2xl p-3.5 text-sm bg-white">
+                        <option value="숙성고깃집/삼겹살">숙성 고깃집 / 삼겹살 전문점</option>
+                        <option value="컵밥/덮밥전문점">테이크아웃 컵밥 / 덮밥 전문점</option>
+                        <option value="디저트카페">감성 베이커리 / 디저트 카페</option>
+                        <option value="동네식자재마트">동네 식자재 마트 / 편의점</option>
+                        <option value="의류/잡화샵">소규모 의류 / 소품 잡화 샵</option>
+                        <option value="기타일반업종">기타 일반 업종</option>
+                    </select>
+                </div>
+                <div><label class="block text-xs font-semibold mb-1">대표자 성함</label><input type="text" id="signupOwnerName" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
+                <div><label class="block text-xs font-semibold mb-1">생년월일 8자리 (계정 찾기용)</label><input type="text" id="signupBirth" required maxlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="예: 19801225"></div>
+                <div><label class="block text-xs font-semibold mb-1">대표 전화번호</label><input type="tel" id="signupPhone" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="010-0000-0000"></div>
+                <div>
+                    <label class="block text-xs font-semibold mb-1">아이디</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="signupEmail" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30">
+                        <button type="button" onclick="checkIdDuplicate()" class="bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs shrink-0">중복확인</button>
+                    </div>
+                    <span id="idCheckMsg" class="text-[11px] mt-1 block"></span>
+                </div>
+                <div><label class="block text-xs font-semibold mb-1">비밀번호 (8자리 이상)</label><input type="password" id="signupPw" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
+                <div><label class="block text-xs font-semibold mb-1">비밀번호 확인</label><input type="password" id="signupPwConfirm" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
+                <div class="pt-2 flex gap-2">
+                    <button type="button" onclick="closeSignupModal()" class="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
+                    <button type="submit" class="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl text-sm">가입 완료</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 알바생 회원가입 모달 -->
+    <div id="staffSignupModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
+            <div class="bg-emerald-600 p-6 flex justify-between items-center text-white shrink-0">
+                <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-clock mr-2"></i>알바생 무료 회원가입</h3>
+                <button onclick="closeStaffSignupModal()" class="text-emerald-200 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <form onsubmit="handleStaffSignup(event)" class="p-6 space-y-4 overflow-y-auto no-scrollbar">
+                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-xs text-emerald-800">💡 사장님께 받은 <b>매장 고유 4자리 코드</b>를 정확히 입력하세요.</div>
+                <div><label class="block text-xs font-semibold mb-1">매장 4자리 코드</label><input type="text" id="staffStoreCode" required class="w-full border rounded-2xl p-3.5 text-sm uppercase font-bold text-center text-lg tracking-widest"></div>
+                <div><label class="block text-xs font-semibold mb-1">이름</label><input type="text" id="staffName" required class="w-full border rounded-2xl p-3.5 text-sm"></div>
+                <div><label class="block text-xs font-semibold mb-1">생년월일 8자리 (계정 찾기용)</label><input type="text" id="staffBirth" required maxlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="예: 20020505"></div>
+                <div><label class="block text-xs font-semibold mb-1">전화번호 (계정 찾기용)</label><input type="tel" id="staffPhone" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="010-0000-0000"></div>
+                <div><label class="block text-xs font-semibold mb-1">사용할 아이디</label><input type="text" id="staffEmail" required class="w-full border rounded-2xl p-3.5 text-sm"></div>
+                <div><label class="block text-xs font-semibold mb-1">비밀번호</label><input type="password" id="staffPw" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm"></div>
+                <div class="pt-2 flex gap-2">
+                    <button type="button" onclick="closeStaffSignupModal()" class="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
+                    <button type="submit" class="flex-1 py-4 bg-emerald-600 text-white font-bold rounded-2xl text-sm shadow">가입 완료</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ★ 판매 정산 (과거 보정 모달) -->
+    <div id="batchSaleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4 border border-slate-100">
+            <h3 class="font-extrabold text-lg text-slate-900" id="batchModalTitle">상품 판매 정산</h3>
+            <p class="text-xs text-slate-500" id="batchModalStockInfo">현재고: 0개</p>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">정산 기준 날짜 (과거 보정 시 수정)</label>
+                <input type="date" id="batchSaleDate" class="w-full border rounded-xl p-3 text-sm focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">판매 수량 입력</label>
+                <input type="text" id="batchSaleInput" oninput="formatCurrencyInput(this)" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="팔린 수량 입력">
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeBatchSaleModal()" class="flex-1 py-3.5 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
+                <button onclick="confirmBatchSale()" class="flex-1 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl text-sm shadow">정산 반영</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ★ 사장님 달력 스케줄 팝업 모달 (유일한 정의) -->
+    <div id="ownerCalendarModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-calendar-plus text-indigo-600 mr-2"></i>직원 스케줄 달력</h3>
+                <button onclick="closeOwnerCalendarModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="text-xs text-slate-500 mb-2">날짜 칸을 클릭하여 해당 요일의 근무 시간을 직접 적으세요.</div>
+            <!-- 달력이 그려질 컨테이너 -->
+            <div id="ownerCalendarContainer" class="bg-white p-2 rounded-2xl border shadow-sm"></div>
+            <button onclick="closeOwnerCalendarModal()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-2xl text-sm mt-2">완료 및 닫기</button>
+        </div>
+    </div>
+
+    <!-- 관리자 지점 장부 모달 -->
+    <div id="storeInventoryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex flex-col justify-end z-50">
+        <div class="bg-white w-full rounded-t-3xl h-[85vh] flex flex-col border-t border-slate-100">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl shrink-0">
+                <div><h3 class="font-extrabold text-lg text-slate-900" id="modalStoreName">가게 이름</h3><p class="text-xs text-slate-500" id="modalStoreInfo">대표자 / 업종</p></div>
+                <button onclick="closeStoreInventory()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            <div class="grid grid-cols-3 gap-2 p-4 bg-slate-100/70 border-b border-slate-100 text-center text-xs shrink-0">
+                <div><span class="text-slate-500 block mb-0.5">총매출</span><b class="text-slate-900 text-sm" id="modalRevenue">₩ 0</b></div>
+                <div><span class="text-slate-500 block mb-0.5">발주비용</span><b class="text-orange-600 text-sm" id="modalCost">₩ 0</b></div>
+                <div><span class="text-emerald-700 block mb-0.5 font-bold">순수익</span><b class="text-emerald-700 text-sm" id="modalProfit">₩ 0</b></div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-2.5 no-scrollbar" id="modalInventoryList"></div>
+            <div class="p-4 bg-white border-t border-slate-100 shrink-0">
+                <button onclick="exportAdminToCSV()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl text-sm shadow transition">
+                    <i class="fa-solid fa-file-excel mr-1"></i> 📊 해당 지점 전체 장부 엑셀(CSV) 다운로드
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 구독 모달 -->
+    <div id="subscriptionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-star text-amber-500 mr-2"></i>PRO 멤버십 (월 3만 원)</h3>
+                <button onclick="closeSubscriptionModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="space-y-3 text-xs text-slate-600 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                <p>✔ 알바생 5명 이상 무제한 인원 확장 관리</p>
+                <p>✔ 달력 기반 연장/야간/특근 수당 자동 계산</p>
+                <p>✔ 세무 신고용 완벽 엑셀(CSV) 원클릭 다운로드</p>
+            </div>
+            <div class="pt-2 space-y-2">
+                <button onclick="payMonthlySubscription()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-4 rounded-2xl text-sm shadow-xl transition">💳 매월 30,000원 결제</button>
+                <button onclick="closeSubscriptionModal()" class="w-full bg-slate-100 font-bold py-3 rounded-2xl text-xs">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메인 앱 화면 -->
+    <div id="appScreen" class="hidden flex flex-col h-screen overflow-hidden relative bg-slate-100">
+        <header class="bg-slate-900 text-white px-5 py-4 flex justify-between items-center shadow-md shrink-0 border-b border-slate-800">
+            <div class="font-extrabold text-base flex items-center tracking-tight">
+                <i class="fa-solid fa-store text-indigo-400 mr-2.5 text-lg" id="headerIcon"></i>
+                <span id="headerTitle">스마트 재고 관리</span>
+            </div>
+            <button onclick="logout()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl border border-slate-700 font-semibold">로그아웃</button>
+        </header>
+
+        <main class="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4 pb-24">
+            
+            <!-- [탭 1] 사장님 대시보드 -->
+            <div id="tabContentDashboard" class="space-y-4 hidden">
+                <div id="proPitchBanner" class="bg-gradient-to-r from-amber-100 to-orange-50 border border-amber-200 p-5 rounded-2xl shadow-sm mb-2">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-extrabold text-amber-900 text-base"><i class="fa-solid fa-crown text-amber-500 mr-1"></i> PRO 멤버십으로 매장 자동화 완성</h4>
+                    </div>
+                    <ul class="text-xs text-amber-800 space-y-1.5 mb-3 font-medium">
+                        <li><i class="fa-solid fa-check text-amber-600 mr-1"></i> 알바생 무제한 등록 & 캘린더 스케줄 관리</li>
+                        <li><i class="fa-solid fa-check text-amber-600 mr-1"></i> 연장/야간/휴일 특근 수당 완벽 자동 계산</li>
+                        <li><i class="fa-solid fa-check text-amber-600 mr-1"></i> AI 도매처 실시간 최저가 비교 (월 수십만 원 절감)</li>
+                    </ul>
+                    <button onclick="openSubscriptionModal()" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold py-3.5 rounded-xl shadow-md transition text-sm">
+                        월 30,000원으로 업그레이드
+                    </button>
+                </div>
+
+                <div class="bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 p-6 rounded-3xl shadow-xl shadow-indigo-600/15 text-white flex justify-between items-center relative overflow-hidden">
+                    <div class="relative z-10">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <span class="text-xs text-indigo-200 font-semibold">이번 달 실질 순수익</span>
+                        </div>
+                        <h3 class="text-3xl font-extrabold tracking-tight" id="totalNetProfit">₩ 0</h3>
+                    </div>
+                    <div class="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 relative z-10"><i class="fa-solid fa-wallet text-2xl text-amber-300"></i></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl flex flex-col justify-center">
+                        <p class="font-bold text-emerald-950 text-[11px] mb-1"><i class="fa-solid fa-fire text-emerald-600"></i> 오늘 판매 현황</p>
+                        <p class="text-emerald-700 text-sm font-extrabold" id="todaySoldSummaryText">0개 (₩0)</p>
+                    </div>
+                    <div class="bg-indigo-50 border border-indigo-200 p-3.5 rounded-2xl flex flex-col justify-center">
+                        <p class="font-bold text-indigo-950 text-[11px] mb-1"><i class="fa-solid fa-key text-indigo-600"></i> 매장 연동 코드</p>
+                        <p class="text-indigo-600 font-mono font-extrabold text-sm" id="storeInviteCodeDisplay">XXXX</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="bg-white p-3 rounded-2xl border text-center"><span class="text-[10px] text-slate-400 block mb-1">총 매출</span><h4 class="text-xs font-extrabold" id="totalRevenue">₩ 0</h4></div>
+                    <div class="bg-white p-3 rounded-2xl border text-center"><span class="text-[10px] text-slate-400 block mb-1">발주 비용</span><h4 class="text-xs font-extrabold text-orange-600" id="totalOrderExpense">₩ 0</h4></div>
+                    <div class="bg-white p-3 rounded-2xl border text-center"><span class="text-[10px] text-slate-400 block mb-1">폐기 손실</span><h4 class="text-xs font-extrabold text-rose-600" id="totalWasteExpense">₩ 0</h4></div>
+                </div>
+
+                <!-- 🔥 매장 BEST 판매 품목 -->
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/60">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="font-bold text-sm text-slate-900"><i class="fa-solid fa-crown text-amber-500 mr-1.5"></i>🔥 매장 BEST 판매 품목</h4>
+                    </div>
+                    <div id="bestSellerList" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- [탭 1-1] 알바생 독립 포털 -->
+            <div id="tabContentStaffPanel" class="space-y-4 hidden">
+                <div class="bg-white rounded-3xl shadow-sm border p-6 text-center space-y-4">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 text-3xl shadow-inner"><i class="fa-solid fa-user-clock"></i></div>
+                    <div><h3 class="font-extrabold text-xl" id="staffPanelName">알바생님 환영합니다!</h3><p class="text-xs text-slate-500 mt-1" id="staffPanelStore">근무지: 연동된 매장</p></div>
+                    
+                    <div class="bg-slate-50 p-4 rounded-2xl border text-xs text-left space-y-2.5 shadow-inner">
+                        <p class="font-bold text-slate-900 text-sm mb-1"><i class="fa-solid fa-receipt mr-1 text-indigo-600"></i> 이번 달 승인된 급여 명세서</p>
+                        <div class="flex justify-between"><span class="text-slate-500">시급:</span> <b class="text-slate-900" id="staffPanelWage">₩ 0</b></div>
+                        <div class="flex justify-between"><span class="text-slate-500">승인된 시간:</span> <b class="text-indigo-600" id="staffPanelTotalHours">0시간 0분</b></div>
+                        <div class="flex justify-between"><span class="text-slate-500">세전 총액:</span> <b class="text-slate-700" id="staffPanelBasePay">₩ 0</b></div>
+                        <div class="flex justify-between"><span class="text-slate-500" id="staffPanelTaxLabel">세금/공제액 (미적용):</span> <b class="text-rose-500" id="staffPanelTax">- ₩ 0</b></div>
+                        <div class="border-t border-slate-200 pt-2 flex justify-between text-sm font-extrabold text-slate-900">
+                            <span>실수령액 (예상):</span> <span class="text-indigo-600" id="staffPanelEstimatedPay">₩ 0</span>
+                        </div>
+                    </div>
+
+                    <div id="pendingWorkBox" class="bg-amber-50 p-4 rounded-2xl border text-left space-y-2 text-xs hidden">
+                        <p class="font-bold text-amber-900 text-sm"><i class="fa-solid fa-triangle-exclamation mr-1 text-amber-600"></i> 근무 승인 요청됨</p>
+                        <p class="text-amber-800" id="pendingWorkText">기록: 0분</p>
+                        <button onclick="approveStaffWorkHours()" class="w-full bg-amber-600 text-white font-bold py-2.5 rounded-xl mt-1">✅ 최종 승인하기</button>
+                    </div>
+
+                    <div class="bg-indigo-50/60 p-4 rounded-2xl border text-left space-y-2 text-xs">
+                        <p class="font-bold text-indigo-950 text-sm"><i class="fa-solid fa-calendar-days mr-1 text-indigo-600"></i> 내 캘린더 스케줄</p>
+                        <div id="staffGridCalendar" class="bg-white p-2 rounded-xl border border-indigo-100"></div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button id="workToggleBtn" onclick="toggleStaffWork()" class="w-full bg-emerald-600 text-white font-extrabold py-4 rounded-2xl shadow-xl text-base transition"><i class="fa-solid fa-play mr-2"></i> 출근하기 (실시간 타이머)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- [탭 2] 사장님 전용 알바생 관리 탭 -->
+            <div id="tabContentStaffManage" class="space-y-4 hidden">
+                <div class="bg-white rounded-2xl shadow-sm border p-5 space-y-4">
+                    <div class="flex justify-between items-center border-b pb-3">
+                        <h3 class="font-bold text-base"><i class="fa-solid fa-users-gear mr-2 text-indigo-600"></i>직원 노무 & 세금 관리</h3>
+                        <span id="staffCountBadge" class="text-[10px] bg-indigo-50 text-indigo-700 font-bold px-2.5 py-1 rounded-xl border">0 / 4명</span>
+                    </div>
+                    <div class="bg-indigo-50 border border-indigo-200 p-4 rounded-2xl flex justify-between items-center text-xs">
+                        <div><p class="font-bold text-indigo-950 mb-0.5"><i class="fa-solid fa-key mr-1"></i> 매장 고유 4자리 코드</p><p class="text-indigo-600 font-mono text-base font-extrabold tracking-widest" id="storeInviteCodeDisplay2">XXXX</p></div>
+                    </div>
+                    
+                    <div id="ownerStaffList" class="space-y-3 pt-2"></div>
+                </div>
+            </div>
+
+            <!-- [탭 3] 재고 관리 및 입/출고 화면 -->
+            <div id="tabContentStock" class="space-y-4 hidden">
+                <div class="bg-white rounded-2xl shadow-sm border p-5">
+                    <h3 class="font-bold text-base mb-3"><i class="fa-solid fa-boxes-packing mr-1.5 text-emerald-600"></i>품목 검색 & 입/출고/판매</h3>
+                    
+                    <div class="relative mb-4">
+                        <input type="text" id="searchInput" oninput="handleSearch()" onfocus="handleSearch()" placeholder="상품 키워드 검색 (10만+ AI DB 지원)" class="w-full border rounded-xl p-3.5 text-sm bg-slate-50/50">
+                        <i class="fa-solid fa-search absolute right-4 top-4 text-slate-400"></i>
+                        <ul id="searchResults" class="hidden absolute z-20 w-full bg-white border shadow-2xl max-h-60 overflow-y-auto rounded-xl mt-1 text-sm"></ul>
+                    </div>
+
+                    <div id="newProductForm" class="hidden mb-4 bg-amber-50/60 p-4 rounded-xl border border-amber-200 space-y-3">
+                        <h4 class="font-bold text-sm text-amber-900"><i class="fa-solid fa-plus-circle mr-1 text-amber-600"></i>새 상품 등록</h4>
+                        <input type="text" id="newProductName" class="w-full border rounded-xl p-2.5 text-sm" placeholder="상품명">
+                        <input type="text" id="newProductCategory" class="w-full border rounded-xl p-2.5 text-sm" placeholder="카테고리 (예: 음식, 음료)">
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" id="newProductCost" oninput="formatCurrencyInput(this)" class="w-full border rounded-xl p-2.5 text-sm" placeholder="원가 (원)">
+                            <input type="text" id="newProductPrice" oninput="formatCurrencyInput(this)" class="w-full border rounded-xl p-2.5 text-sm" placeholder="판매가 (원)">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <div>
+                                <label class="block text-[10px] text-amber-800 font-bold mb-1">발주/입고 날짜</label>
+                                <input type="date" id="newProductOrderDate" class="w-full border border-amber-200 rounded-xl p-2 text-sm bg-white focus:outline-none focus:border-amber-500">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-rose-600 font-bold mb-1">소비기한(유통기한)</label>
+                                <input type="date" id="newProductExpiryDate" class="w-full border border-rose-200 rounded-xl p-2 text-sm bg-white focus:outline-none focus:border-rose-500">
+                            </div>
+                        </div>
+                        <button onclick="registerCustomProduct()" class="w-full bg-amber-600 text-white font-bold py-2.5 rounded-xl shadow mt-2">등록하기</button>
+                    </div>
+
+                    <div id="myInventoryList" class="space-y-3 mt-6 border-t pt-4"></div>
+                </div>
+            </div>
+
+            <!-- [탭 4] 통계 화면 -->
+            <div id="tabContentStats" class="space-y-4 hidden">
+                <div class="bg-white rounded-2xl shadow-sm border p-5">
+                    <h3 class="font-bold text-base text-slate-900 mb-3"><i class="fa-solid fa-chart-bar mr-1.5 text-indigo-600"></i>요일별 매출 & 판매 분석</h3>
+                    <div class="grid grid-cols-7 gap-1.5 text-center h-28" id="weekdayStatsGrid"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border p-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-base text-slate-900"><i class="fa-solid fa-calendar-check mr-1.5 text-emerald-600"></i>일자별 상세 판매 내역</h3>
+                        <input type="date" id="statsDatePicker" onchange="renderDailyDetailedStats()" class="border border-slate-200 rounded-lg p-1.5 text-[11px] font-bold focus:outline-none focus:border-emerald-500">
+                    </div>
+                    
+                    <div id="dailyTotalSummary" class="bg-emerald-50 p-3 rounded-xl mb-3 flex justify-between items-center border border-emerald-100 shadow-inner">
+                        <span class="font-bold text-emerald-900 text-xs">총 0개 판매</span>
+                        <span class="font-extrabold text-indigo-700 text-sm">매출 ₩0</span>
+                    </div>
+
+                    <div id="dailyDetailedStatsList" class="space-y-2 text-xs"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border p-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-base text-slate-900"><i class="fa-solid fa-calendar-alt mr-1.5 text-blue-600"></i>월별 품목 매출 랭킹</h3>
+                        <input type="month" id="statsMonthPicker" onchange="renderMonthlyItemStats()" class="border border-slate-200 rounded-lg p-1.5 text-[11px] font-bold focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div id="monthlyItemStatsList" class="space-y-2 text-xs"></div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border p-5">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-base text-slate-900"><i class="fa-solid fa-chart-pie mr-1.5 text-purple-600"></i>특정 요일별 품목 매출</h3>
+                        <select id="statsWeekdayPicker" onchange="renderWeekdayItemStats()" class="border border-slate-200 rounded-lg p-1.5 text-[11px] font-bold focus:outline-none focus:border-purple-500">
+                            <option value="일">일요일</option>
+                            <option value="월">월요일</option>
+                            <option value="화">화요일</option>
+                            <option value="수">수요일</option>
+                            <option value="목">목요일</option>
+                            <option value="금" selected>금요일</option>
+                            <option value="토">토요일</option>
+                        </select>
+                    </div>
+                    <div id="weekdayItemStatsList" class="space-y-2 text-xs"></div>
+                </div>
+            </div>
+
+            <!-- [탭 5] 총괄 관리자(관제탑) -->
+            <div id="adminSection" class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-5 hidden">
+                <div class="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-900"><i class="fa-solid fa-chart-pie mr-2 text-indigo-600"></i>본사 관제탑 대시보드</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">전국 가맹점 모니터링 및 엑셀 무제한 권한</p>
+                    </div>
+                    <span class="text-[10px] text-white font-bold bg-slate-800 px-2.5 py-1 rounded-lg">만능 마스터</span>
+                </div>
+                
+                <div class="mb-5 p-4 border-2 border-indigo-100 rounded-2xl bg-indigo-50 flex justify-between items-center shadow-xs">
+                    <div>
+                        <p class="font-bold text-sm text-slate-950 mb-0.5"><i class="fa-solid fa-store mr-1 text-indigo-600"></i> 본사 직영 매장</p>
+                    </div>
+                    <button onclick="openStoreInventory('seolyh0328')" class="bg-indigo-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">가게 관리</button>
+                </div>
+
+                <div id="adminUserList" class="space-y-4"></div>
+            </div>
+        </main>
+
+        <!-- 하단 탭 바 (사장님 전용) -->
+        <nav class="bg-white border-t flex justify-around py-3 shrink-0 z-30 shadow-lg" id="mobileBottomNav">
+            <button onclick="switchTab('dashboard')" id="navBtnDashboard" class="flex flex-col items-center text-indigo-600 font-bold text-xs"><i class="fa-solid fa-chart-pie text-xl mb-0.5"></i>대시보드</button>
+            <button onclick="switchTab('stock')" id="navBtnStock" class="flex flex-col items-center text-slate-400 font-semibold text-xs"><i class="fa-solid fa-boxes-stacked text-xl mb-0.5"></i>재고/입출고</button>
+            <button onclick="switchTab('staffManage')" id="navBtnStaffManage" class="flex flex-col items-center text-slate-400 font-semibold text-xs"><i class="fa-solid fa-users-gear text-xl mb-0.5"></i>알바관리</button>
+            <button onclick="switchTab('stats')" id="navBtnStats" class="flex flex-col items-center text-slate-400 font-semibold text-xs"><i class="fa-solid fa-chart-simple text-xl mb-0.5"></i>통계</button>
+        </nav>
+    </div>
+
+    <!-- 로직 스크립트 -->
+    <script>
+        // AI 10만+ 도매 매칭 시뮬레이션
+        function getAIRecommendations(q) {
+            const brands = {
+                "빵": ["삼립 정통 크림빵", "샤니 꿀호떡", "파리바게뜨 토스트식빵", "뚜레쥬르 옥수수식빵", "냉동 크로와상 생지(50입)", "업소용 햄버거번(30입)"],
+                "우유": ["서울우유 1L", "매일우유 900ml", "남양 맛있는우유GT", "연세우유 멸균우유 1박스", "파스퇴르 우유"],
+                "커피": ["스타벅스 로스트 원두 1kg", "맥심 모카골드(200T)", "카누 미니(100T)", "이디야 블렌드 원두 1kg", "콜롬비아 수프리모 1kg"],
+                "고기": ["한돈 삼겹살(냉장 1kg)", "수입산 대패삼겹살(3kg)", "한우 1++ 등심(500g)", "미국산 프라임 척아이롤(2kg)"],
+                "치즈": ["서울우유 체다치즈(100매)", "매일유업 모짜렐라(1kg)", "필라델피아 크림치즈", "업소용 눈꽃치즈(2kg)"],
+                "맥주": ["카스(병 500ml)", "테라(병 500ml)", "켈리(병 500ml)", "아사히 수퍼드라이", "하이네켄 케그(5L)"],
+                "소주": ["참이슬 후레쉬", "참이슬 오리지널", "진로 이즈백", "처음처럼", "새로"],
+                "라면": ["신라면(30봉 1박스)", "진라면 매운맛(30봉)", "짜파게티(30봉)", "불닭볶음면(30봉)"]
+            };
+            
+            let results = [];
+            for (let key in brands) {
+                if (q.includes(key) || key.includes(q)) {
+                    brands[key].forEach(name => {
+                        results.push({ name: name, category: "AI도매매칭", defaultCost: Math.floor(Math.random()*5000+1000), defaultPrice: Math.floor(Math.random()*8000+2000) });
+                    });
+                }
+            }
+            if (results.length === 0) {
+                results.push({ name: `[업소용 대용량] ${q}`, category: "AI도매매칭", defaultCost: 15000, defaultPrice: 25000 });
+                results.push({ name: `가성비 ${q} (B2B 전용)`, category: "AI도매매칭", defaultCost: 5000, defaultPrice: 10000 });
+            }
+            return results;
+        }
+
+        function getLocalIsoDate() {
+            const offset = new Date().getTimezoneOffset() * 60000;
+            return new Date(Date.now() - offset).toISOString().slice(0, 10);
+        }
+
+        function formatHM(minutes) {
+            if (!minutes || minutes <= 0) return "0분";
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            if (h > 0 && m > 0) return `${h}시간 ${m}분`;
+            if (h > 0) return `${h}시간`;
+            return `${m}분`;
+        }
+
+        function formatCurrencyInput(input) {
+            let val = input.value.replace(/[^0-9]/g, '');
+            input.value = val ? Number(val).toLocaleString() : '';
+        }
+
+        // ==========================================
+        // ★ 세션 유지 방어 로직
+        // ==========================================
+        function initSystem() {
+            if (!localStorage.getItem("smart_stock_users_v58")) {
+                localStorage.setItem("smart_stock_users_v58", JSON.stringify({"seolyh0328": { role: "admin", password: "yongho0229!", name: "총괄 본사", storeCode: "ADMIN" }}));
+                localStorage.setItem("smart_stock_inventory_v58", JSON.stringify({}));
+                localStorage.setItem("smart_stock_sales_v58", JSON.stringify({}));
+                localStorage.setItem("smart_stock_staffs_v58", JSON.stringify({}));
+                localStorage.setItem("smart_stock_schedules_v58", JSON.stringify({}));
+                localStorage.setItem("smart_stock_subs_v58", JSON.stringify({}));
+            }
+            
+            const autoLogin = localStorage.getItem("smart_stock_autologin_v58");
+            if (autoLogin) {
+                try {
+                    const sd = JSON.parse(autoLogin);
+                    const users = JSON.parse(localStorage.getItem("smart_stock_users_v58"));
+                    const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+                    
+                    if (sd.role === 'staff' && staffs && staffs[sd.email] && staffs[sd.email].password === sd.pw) {
+                        currentLoggedInEmail = sd.email; selectedRole = 'staff'; 
+                        document.getElementById("loginScreen").classList.add("hidden");
+                        enterStaffApp(staffs[sd.email]);
+                        return;
+                    } else if (users && users[sd.email] && users[sd.email].role === sd.role && users[sd.email].password === sd.pw) {
+                        currentLoggedInEmail = sd.email; selectedRole = sd.role; 
+                        document.getElementById("loginScreen").classList.add("hidden");
+                        enterApp(users[sd.email]);
+                        return;
+                    }
+                } catch(e) { 
+                    localStorage.removeItem("smart_stock_autologin_v58"); 
+                }
+            }
+            
+            document.getElementById("loginScreen").classList.remove("hidden");
+            const dateObj = new Date();
+            if(document.getElementById("statsDatePicker")) {
+                document.getElementById("statsDatePicker").value = getLocalIsoDate();
+                document.getElementById("statsMonthPicker").value = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+            }
+        }
+
+        let selectedRole = "owner";
+        let currentLoggedInEmail = null;
+        let batchTargetItemId = null;
+        let isIdChecked = false;
+        let currentCalendarTargetStaff = null;
+        let currentAdminModalUserId = null;
+        
+        let calYear = new Date().getFullYear();
+        let calMonth = new Date().getMonth();
+
+        document.addEventListener("DOMContentLoaded", initSystem);
+
+        function switchTab(tabName) {
+            document.getElementById("tabContentDashboard").classList.add("hidden");
+            document.getElementById("tabContentStaffPanel")?.classList.add("hidden");
+            document.getElementById("tabContentStaffManage")?.classList.add("hidden");
+            document.getElementById("tabContentStock").classList.add("hidden");
+            document.getElementById("tabContentStats").classList.add("hidden");
+            document.getElementById("adminSection").classList.add("hidden");
+
+            document.getElementById("navBtnDashboard").className = "flex flex-col items-center text-slate-400 font-semibold text-xs";
+            document.getElementById("navBtnStock").className = "flex flex-col items-center text-slate-400 font-semibold text-xs";
+            document.getElementById("navBtnStaffManage").className = "flex flex-col items-center text-slate-400 font-semibold text-xs";
+            document.getElementById("navBtnStats").className = "flex flex-col items-center text-slate-400 font-semibold text-xs";
+
+            if (tabName === 'dashboard') {
+                if (selectedRole === 'staff') document.getElementById("tabContentStaffPanel").classList.remove("hidden");
+                else if (selectedRole === 'admin') document.getElementById("adminSection").classList.remove("hidden");
+                else document.getElementById("tabContentDashboard").classList.remove("hidden");
+                document.getElementById("navBtnDashboard").className = "flex flex-col items-center text-indigo-600 font-bold text-xs";
+            } else if (tabName === 'stock') {
+                document.getElementById("tabContentStock").classList.remove("hidden");
+                document.getElementById("navBtnStock").className = "flex flex-col items-center text-indigo-600 font-bold text-xs";
+            } else if (tabName === 'staffManage') {
+                document.getElementById("tabContentStaffManage").classList.remove("hidden");
+                document.getElementById("navBtnStaffManage").className = "flex flex-col items-center text-indigo-600 font-bold text-xs";
+                renderOwnerStaffList();
+            } else if (tabName === 'stats') {
+                document.getElementById("tabContentStats").classList.remove("hidden");
+                document.getElementById("navBtnStats").className = "flex flex-col items-center text-indigo-600 font-bold text-xs";
+                renderDailyDetailedStats();
+                renderMonthlyItemStats();
+                renderWeekdayItemStats();
+            }
+        }
+
+        function switchLoginRole(role) {
+            selectedRole = role;
+            document.getElementById("tabOwner").className = role === "owner" ? "flex-1 py-3 text-xs font-bold rounded-xl bg-white text-indigo-600 shadow-sm" : "flex-1 py-3 text-xs font-bold rounded-xl text-slate-500";
+            document.getElementById("tabStaff").className = role === "staff" ? "flex-1 py-3 text-xs font-bold rounded-xl bg-white text-emerald-600 shadow-sm" : "flex-1 py-3 text-xs font-bold rounded-xl text-slate-500";
+            document.getElementById("tabAdmin").className = role === "admin" ? "flex-1 py-3 text-xs font-bold rounded-xl bg-white text-slate-900 shadow-sm" : "flex-1 py-3 text-xs font-bold rounded-xl text-slate-500";
+            document.getElementById("loginSubmitBtn").innerText = role === "owner" ? "사장님 로그인" : role === "staff" ? "알바생 로그인" : "관리자 로그인";
+            document.getElementById("signupPrompt").style.display = role === "admin" ? "none" : "block";
+        }
+
+        function openFindAccountModal() { document.getElementById("findAccountModal").classList.remove("hidden"); document.getElementById("findResult").innerHTML = '<span class="text-xs text-slate-400">가입 시 입력한 정보를 바탕으로 조회합니다.</span>'; }
+        function closeFindAccountModal() { document.getElementById("findAccountModal").classList.add("hidden"); }
+        function findAccount(e) {
+            e.preventDefault();
+            const role = document.getElementById("findRole").value;
+            const name = document.getElementById("findName").value.trim();
+            const phone = document.getElementById("findPhone").value.trim();
+            const birth = document.getElementById("findBirth").value.trim();
+            
+            let foundEmail = null; let foundPw = null;
+
+            if (role === 'owner') {
+                const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+                for(let k in users) {
+                    if(users[k].name === name && users[k].phone === phone && users[k].birth === birth) {
+                        foundEmail = k; foundPw = users[k].password; break;
+                    }
+                }
+            } else {
+                const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
+                for(let k in staffs) {
+                    if(staffs[k].name === name && staffs[k].phone === phone && staffs[k].birth === birth) {
+                        foundEmail = k; foundPw = staffs[k].password; break;
+                    }
+                }
+            }
+
+            const res = document.getElementById("findResult");
+            if (foundEmail) res.innerHTML = `<p class="text-emerald-600 font-extrabold text-sm mb-1">조회 성공!</p><p class="text-slate-800 text-xs">아이디: <b class="text-indigo-600">${foundEmail}</b><br>비밀번호: <b class="text-rose-600">${foundPw}</b></p>`;
+            else res.innerHTML = `<p class="text-rose-600 font-bold text-sm">일치하는 계정 정보가 없습니다.</p>`;
+        }
+
+        function openSignupModal() { document.getElementById("signupModal").classList.remove("hidden"); isIdChecked = false; }
+        function closeSignupModal() { document.getElementById("signupModal").classList.add("hidden"); }
+        function openStaffSignupModal() { document.getElementById("staffSignupModal").classList.remove("hidden"); }
+        function closeStaffSignupModal() { document.getElementById("staffSignupModal").classList.add("hidden"); }
+
+        function checkIdDuplicate() {
+            const email = document.getElementById("signupEmail").value.trim();
+            const msg = document.getElementById("idCheckMsg");
+            if (!email) return alert("아이디를 입력하세요");
+            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
+            if (users[email] || staffs[email]) { isIdChecked = false; msg.className = "text-[11px] mt-1 block font-bold text-rose-600"; msg.innerText = "❌ 중복 아이디"; }
+            else { isIdChecked = true; msg.className = "text-[11px] mt-1 block font-bold text-emerald-600"; msg.innerText = "✅ 사용 가능"; }
+        }
+
+        function handleSignup(e) {
+            e.preventDefault();
+            const email = document.getElementById("signupEmail").value.trim();
+            if (!isIdChecked) return alert("중복 확인을 하세요");
+            const pw = document.getElementById("signupPw").value;
+            if (pw !== document.getElementById("signupPwConfirm").value) return alert("비밀번호 불일치");
+            
+            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+            let storeCode = ""; const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            for (let i = 0; i < 4; i++) storeCode += chars.charAt(Math.floor(Math.random() * chars.length));
+
+            users[email] = { 
+                role: "owner", password: pw, name: document.getElementById("signupName").value, storeCode,
+                ownerName: document.getElementById("signupOwnerName").value,
+                phone: document.getElementById("signupPhone").value,
+                birth: document.getElementById("signupBirth").value,
+                businessType: document.getElementById("signupBusinessType").value
+            };
+            localStorage.setItem("smart_stock_users_v58", JSON.stringify(users));
+
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58")) || {}; inv[email] = {}; localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {}; sales[email] = { revenue: 0, orderExpense: 0, wasteExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} }; localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
+
+            alert(`가입 완료! 매장 코드: [${storeCode}]`);
+            closeSignupModal();
+        }
+
+        function handleStaffSignup(e) {
+            e.preventDefault();
+            const storeCode = document.getElementById("staffStoreCode").value.trim().toUpperCase();
+            const email = document.getElementById("staffEmail").value.trim();
+            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58"));
+            let ownerEmail = null;
+            for (let k in users) { if (users[k].storeCode === storeCode) ownerEmail = k; }
+            if (!ownerEmail) return alert("❌ 존재하지 않는 매장 코드입니다!");
+
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
+            const subs = JSON.parse(localStorage.getItem("smart_stock_subs_v58")) || {};
+            let count = Object.values(staffs).filter(s => s.ownerEmail === ownerEmail).length;
+            if (count >= 4 && !subs[ownerEmail]?.active) return alert("무료 인원(4명) 초과! 사장님께 PRO 구독 요청.");
+            if (staffs[email]) return alert("이미 등록된 아이디입니다.");
+
+            staffs[email] = { 
+                role: "staff", password: document.getElementById("staffPw").value, name: document.getElementById("staffName").value, 
+                phone: document.getElementById("staffPhone").value, birth: document.getElementById("staffBirth").value,
+                wage: 10030, ownerEmail, storeName: users[ownerEmail].name, working: false, pendingMinutes: 0, approvedMinutes: 0, taxType: 'none'
+            };
+            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+            alert("알바생 가입 완료!"); closeStaffSignupModal();
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById("loginEmail").value.trim();
+            const pw = document.getElementById("loginPw").value;
+            const remember = document.getElementById("rememberMe").checked;
+
+            if (selectedRole === 'staff') {
+                const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
+                if (staffs[email] && staffs[email].password === pw) {
+                    currentLoggedInEmail = email;
+                    if (remember) localStorage.setItem("smart_stock_autologin_v58", JSON.stringify({ email, pw, role: 'staff' }));
+                    enterStaffApp(staffs[email]);
+                } else alert("로그인 실패");
+            } else {
+                const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+                if (users[email] && users[email].role === selectedRole && users[email].password === pw) {
+                    currentLoggedInEmail = email;
+                    if (remember) localStorage.setItem("smart_stock_autologin_v58", JSON.stringify({ email, pw, role: selectedRole }));
+                    enterApp(users[email]);
+                } else alert("로그인 실패");
+            }
+        }
+
+        function enterApp(user) {
+            document.getElementById("loginScreen").classList.add("hidden");
+            document.getElementById("appScreen").classList.remove("hidden");
+            
+            if (user.role === "owner") {
+                document.getElementById("headerTitle").innerText = `${user.name} 재고 관리`;
+                document.getElementById("storeInviteCodeDisplay").innerText = user.storeCode;
+                document.getElementById("storeInviteCodeDisplay2").innerText = user.storeCode;
+                document.getElementById("mobileBottomNav").classList.remove("hidden");
+                document.getElementById("adminSection").classList.add("hidden");
+                calYear = new Date().getFullYear(); calMonth = new Date().getMonth();
+            } else if (user.role === "admin") {
+                document.getElementById("headerTitle").innerText = "관제탑 (본사 만능)";
+                document.getElementById("mobileBottomNav").classList.add("hidden");
+                document.getElementById("tabContentDashboard").classList.add("hidden");
+                document.getElementById("tabContentStaffPanel").classList.add("hidden");
+                document.getElementById("tabContentStaffManage").classList.add("hidden");
+                document.getElementById("tabContentStock").classList.add("hidden");
+                document.getElementById("tabContentStats").classList.add("hidden");
+                document.getElementById("adminSection").classList.remove("hidden");
+                renderAdminDashboard();
+            }
+            if(user.role !== "admin") {
+                refreshDashboard(); switchTab('dashboard');
+            }
+        }
+
+        function enterStaffApp(staff) {
+            document.getElementById("loginScreen").classList.add("hidden");
+            document.getElementById("appScreen").classList.remove("hidden");
+            document.getElementById("mobileBottomNav").classList.add("hidden");
+            
+            document.getElementById("headerTitle").innerText = `${staff.storeName} 알바 포털`;
+            document.getElementById("staffPanelName").innerText = `${staff.name}님 환영합니다!`;
+            document.getElementById("staffPanelStore").innerText = `근무지: ${staff.storeName}`;
+            document.getElementById("staffPanelWage").innerText = `₩ ${staff.wage.toLocaleString()}`;
+            
+            document.getElementById("staffPanelTotalHours").innerText = formatHM(staff.approvedMinutes || 0);
+            
+            const hoursWorked = (staff.approvedMinutes || 0) / 60;
+            const basePay = Math.round(hoursWorked * staff.wage);
+            let taxRate = 0; let taxName = "미적용";
+            if (staff.taxType === '3.3') { taxRate = 0.033; taxName = "3.3% (프리랜서)"; }
+            else if (staff.taxType === '4ins') { taxRate = 0.094; taxName = "4대보험 (약 9.4%)"; }
+            const taxAmount = Math.round(basePay * taxRate);
+            const netPay = basePay - taxAmount;
+
+            document.getElementById("staffPanelBasePay").innerText = `₩ ${basePay.toLocaleString()}`;
+            document.getElementById("staffPanelTaxLabel").innerText = `세금/공제액 (${taxName}):`;
+            document.getElementById("staffPanelTax").innerText = `- ₩ ${taxAmount.toLocaleString()}`;
+            document.getElementById("staffPanelEstimatedPay").innerText = `₩ ${netPay.toLocaleString()}`;
+            
+            if (staff.pendingMinutes > 0) {
+                document.getElementById("pendingWorkBox").classList.remove("hidden");
+                document.getElementById("pendingWorkText").innerText = `사장님이 요청/대기 중인 시간: ${formatHM(staff.pendingMinutes)}`;
+            } else {
+                document.getElementById("pendingWorkBox").classList.add("hidden");
+            }
+            
+            calYear = new Date().getFullYear(); calMonth = new Date().getMonth();
+            renderCalendar('staffGridCalendar', currentLoggedInEmail, 'staff');
+            updateStaffWorkButtonState(staff);
+            switchTab('dashboard');
+        }
+
+        function logout() {
+            localStorage.removeItem("smart_stock_autologin_v58");
+            currentLoggedInEmail = null;
+            location.reload();
+        }
+
+        // ==========================================
+        // ★ 달력 렌더링 코어 로직
+        // ==========================================
+        function changeCalMonth(offset, containerId, targetEmail, role) {
+            calMonth += offset;
+            if (calMonth > 11) { calMonth = 0; calYear++; }
+            if (calMonth < 0) { calMonth = 11; calYear--; }
+            renderCalendar(containerId, targetEmail, role);
+        }
+
+        function renderCalendar(containerId, targetEmail, role) {
+            const container = document.getElementById(containerId);
+            if(!container) return;
+            const firstDay = new Date(calYear, calMonth, 1).getDay(); 
+            const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+            const yyyy = String(calYear); const mm = String(calMonth + 1).padStart(2, '0');
+            const todayStr = getLocalIsoDate();
+
+            const sch = JSON.parse(localStorage.getItem("smart_stock_schedules_v58")) || {};
+            const mySch = sch[targetEmail] || {};
+
+            let html = `
+                <div class="flex justify-between items-center mb-3 px-2">
+                    <button onclick="changeCalMonth(-1, '${containerId}', '${targetEmail}', '${role}')" class="text-slate-400 hover:text-indigo-600"><i class="fa-solid fa-chevron-left text-lg"></i></button>
+                    <div class="font-extrabold text-indigo-900 text-sm">${calYear}년 ${calMonth+1}월</div>
+                    <button onclick="changeCalMonth(1, '${containerId}', '${targetEmail}', '${role}')" class="text-slate-400 hover:text-indigo-600"><i class="fa-solid fa-chevron-right text-lg"></i></button>
+                </div>`;
+            html += `<div class="grid grid-cols-7 text-center text-[10px] font-bold text-slate-400 mb-1"><div class="text-rose-500">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-500">토</div></div><div class="grid grid-cols-7 gap-1">`;
+            
+            for(let i=0; i<firstDay; i++) html += `<div></div>`;
+            for(let d=1; d<=daysInMonth; d++) {
+                const dd = String(d).padStart(2, '0'); const cur = `${yyyy}-${mm}-${dd}`;
+                const has = mySch[cur]; const isToday = cur === todayStr;
+                let cls = "p-1 flex flex-col items-center justify-start min-h-[50px] border rounded-lg text-xs cursor-pointer ";
+                cls += isToday ? "border-indigo-400 bg-indigo-50 font-bold " : "bg-white hover:bg-slate-50 border-slate-100 ";
+                let action = role === 'owner' ? `onclick="ownerEditDateSchedule('${targetEmail}', '${cur}', '${containerId}')"` : `onclick="alert('${cur}\\n근무 스케줄: ${has||'휴무'}')"` ;
+                html += `<div class="${cls}" ${action}><span>${d}</span>${has ? `<span class="bg-indigo-600 text-white text-[8px] px-1 py-0.5 mt-0.5 rounded w-full text-center overflow-hidden truncate whitespace-nowrap" title="${has}">${has}</span>` : ''}</div>`;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // ★ 사장님 전용 알바생 관리 탭 (시급 & 스케줄 버튼 완벽 복원)
+        // ==========================================
+        function renderOwnerStaffList() { 
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
+            const schedules = JSON.parse(localStorage.getItem("smart_stock_schedules_v58")) || {};
+            const listContainer = document.getElementById("ownerStaffList");
+            if (!listContainer) return; listContainer.innerHTML = "";
+            
+            let count = 0;
+            for (let email in staffs) {
+                if (staffs[email].ownerEmail === currentLoggedInEmail) {
+                    count++; const s = staffs[email]; 
+                    const storeSch = schedules[email] || {};
+                    let schSummary = Object.keys(storeSch).length > 0 ? Object.entries(storeSch).map(([date, time]) => `${date.slice(5)}: ${time}`).join(', ') : '등록된 스케줄 없음';
+                    
+                    listContainer.innerHTML += `
+                    <div class="bg-slate-50 p-4 rounded-2xl border text-xs flex flex-col mb-2 shadow-sm">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex-1 pr-2">
+                                <p class="font-bold text-sm text-slate-900">${s.name} <span class="text-xs text-slate-500 font-normal">(₩${s.wage.toLocaleString()}/시)</span></p>
+                                <p class="text-slate-600 mt-1">승인 근무: <b class="text-indigo-600">${formatHM(s.approvedMinutes || 0)}</b></p>
+                                ${s.pendingMinutes > 0 ? `<p class="text-rose-500 mt-0.5 font-bold">승인 대기: ${formatHM(s.pendingMinutes)}</p>` : ''}
+                                <p class="text-indigo-700 mt-1 text-[10px] break-keep">📅 ${schSummary}</p>
+                            </div>
+                            <div class="flex flex-col gap-1.5 w-20 shrink-0">
+                                <!-- 시급설정 & 스케줄 버튼 복원 -->
+                                <button onclick="ownerEditStaffWage('${email}')" class="bg-blue-500 text-white font-bold py-1.5 rounded-lg text-[10px] shadow">💰 시급설정</button>
+                                <button onclick="openOwnerCalendarModal('${email}')" class="bg-indigo-600 text-white font-bold py-1.5 rounded-lg text-[10px] shadow">🗓️ 달력스케줄</button>
+                                <button onclick="ownerEditWorkTimeHM('${email}')" class="bg-amber-600 text-white font-bold py-1.5 rounded-lg text-[10px] shadow">⏱️ 시간보정</button>
+                            </div>
+                        </div>
+                        <div class="border-t border-slate-200 pt-2 flex justify-between items-center mt-1">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[10px] font-bold text-slate-500">세금/보험:</span>
+                                <select onchange="ownerChangeTaxType('${email}', this.value)" class="border border-slate-300 rounded p-1 text-[10px] bg-white focus:outline-none focus:border-indigo-500">
+                                    <option value="none" ${!s.taxType || s.taxType==='none' ? 'selected' : ''}>적용 안 함</option>
+                                    <option value="3.3" ${s.taxType==='3.3' ? 'selected' : ''}>3.3% (프리랜서)</option>
+                                    <option value="4ins" ${s.taxType==='4ins' ? 'selected' : ''}>4대보험 (약 9.4%)</option>
+                                </select>
+                            </div>
+                            <button onclick="deleteStaff('${email}')" class="text-rose-500 font-bold px-2 py-1 rounded text-[10px] hover:bg-rose-50 transition">삭제</button>
+                        </div>
+                    </div>`;
+                }
+            }
+            document.getElementById("staffCountBadge").innerText = `${count}명 / 최대 4명`;
+            if (count === 0) listContainer.innerHTML = `<p class="text-center text-slate-400 py-4">등록된 알바생이 없습니다.</p>`;
+        }
+
+        function ownerEditStaffWage(email) {
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            const newWage = parseInt(prompt(`[${staffs[email].name}] 알바생의 새로운 시급(원)을 입력하세요:`, staffs[email].wage), 10);
+            if (isNaN(newWage) || newWage <= 0) return alert("올바른 시급을 입력하세요.");
+            staffs[email].wage = newWage;
+            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+            renderOwnerStaffList();
+            alert("✅ 시급이 성공적으로 변경되었습니다.");
+        }
+
+        function openOwnerCalendarModal(email) {
+            currentCalendarTargetStaff = email;
+            calYear = new Date().getFullYear(); calMonth = new Date().getMonth();
+            document.getElementById("ownerCalendarModal").classList.remove("hidden");
+            renderCalendar('ownerCalendarContainer', email, 'owner');
+        }
+        function closeOwnerCalendarModal() { document.getElementById("ownerCalendarModal").classList.add("hidden"); }
+        
+        function ownerEditDateSchedule(email, dateStr, containerId) {
+            const sch = JSON.parse(localStorage.getItem("smart_stock_schedules_v58")) || {};
+            if (!sch[email]) sch[email] = {};
+            const input = prompt(`[${dateStr}] 근무 시간을 자유롭게 적으세요 (예: 09:00~18:00)\n※ 칸을 완전히 비우면 휴무(삭제) 처리됩니다.`, sch[email][dateStr]||"");
+            if (input === null) return;
+            if (input.trim() === "") delete sch[email][dateStr]; else sch[email][dateStr] = input.trim();
+            localStorage.setItem("smart_stock_schedules_v58", JSON.stringify(sch));
+            renderCalendar(containerId, email, 'owner'); renderOwnerStaffList();
+        }
+
+        function ownerChangeTaxType(email, taxType) {
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            staffs[email].taxType = taxType;
+            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+        }
+
+        function ownerEditWorkTimeHM(email) {
+            const h = parseInt(prompt("인정해 줄 추가 근무 '시간' (예: 6):", "0"), 10);
+            const m = parseInt(prompt("인정해 줄 추가 근무 '분' (예: 30):", "0"), 10);
+            if (isNaN(h) || isNaN(m)) return;
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            staffs[email].pendingMinutes = (staffs[email].pendingMinutes || 0) + (h*60 + m);
+            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+            renderOwnerStaffList(); alert(`요청 완료!`);
+        }
+
+        function deleteStaff(email) {
+            if (!confirm("알바생 명단을 삭제하시겠습니까?")) return;
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            delete staffs[email]; localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs)); renderOwnerStaffList();
+        }
+
+        function toggleStaffWork() {
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            const staff = staffs[currentLoggedInEmail];
+            const todayStr = getLocalIsoDate();
+            const sch = JSON.parse(localStorage.getItem("smart_stock_schedules_v58"))[currentLoggedInEmail] || {};
+
+            if (!staff.working) {
+                if (!sch[todayStr]) return alert("❌ 오늘은 캘린더에 스케줄이 없습니다! 휴무일엔 출근 불가.");
+                staff.working = true; staff.startTime = Date.now();
+                alert("출근 타이머 시작!");
+            } else {
+                const mins = Math.floor((Date.now() - staff.startTime) / (1000 * 60));
+                staff.pendingMinutes = (staff.pendingMinutes || 0) + mins;
+                staff.working = false; staff.startTime = null;
+                alert(`퇴근 완료! ${formatHM(mins)} 사장님 승인 대기열 전송.`);
+            }
+            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+            enterStaffApp(staff);
+        }
+
+        function approveStaffWorkHours() {
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            const staff = staffs[currentLoggedInEmail];
+            staff.approvedMinutes = (staff.approvedMinutes || 0) + (staff.pendingMinutes || 0);
+            staff.pendingMinutes = 0;
+            staffs[currentLoggedInEmail] = staff;
+            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+            enterStaffApp(staff);
+            alert("✅ 근무 시간이 최종 승인되었습니다!");
+        }
+
+        function updateStaffWorkButtonState(staff) {
+            const btn = document.getElementById("workToggleBtn");
+            if (staff.working) {
+                btn.className = "w-full bg-rose-600 text-white font-extrabold py-4 rounded-2xl shadow transition";
+                btn.innerHTML = `<i class="fa-solid fa-stop mr-2"></i> 퇴근하기`;
+            } else {
+                btn.className = "w-full bg-emerald-600 text-white font-extrabold py-4 rounded-2xl shadow transition";
+                btn.innerHTML = `<i class="fa-solid fa-play mr-2"></i> 출근하기 (실시간 타이머)`;
+            }
+        }
+
+        // ==========================================
+        // ★ 직관적 검색 및 AI 10만+ 딥서치 연동 
+        // ==========================================
+        function handleSearch() {
+            const q = document.getElementById("searchInput").value.trim();
+            const box = document.getElementById("searchResults"); box.innerHTML = "";
+            document.getElementById("newProductForm").classList.add("hidden");
+
+            if (!q) { box.classList.add("hidden"); return; }
+            const qLower = q.toLowerCase();
+            
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"))[currentLoggedInEmail] || {};
+            let myItems = Object.keys(inv).map(id => ({id, ...inv[id]})).filter(i => i.name.toLowerCase().includes(qLower));
+            
+            let master = getAIRecommendations(q).filter(i => !myItems.find(m => m.name === i.name));
+            
+            myItems.forEach(i => {
+                const li = document.createElement("li"); li.className = "p-3 bg-indigo-50 cursor-pointer border-b flex justify-between text-xs";
+                li.innerHTML = `<span><i class="fa-solid fa-check text-indigo-600 mr-1"></i><b>${i.name}</b></span><span class="text-indigo-600">${i.stock}개</span>`;
+                li.onclick = () => { alert("보유 재고 리스트에서 수량을 직접 수정하세요!"); document.getElementById("searchInput").value = ""; box.classList.add("hidden"); };
+                box.appendChild(li);
+            });
+            master.forEach(i => {
+                const li = document.createElement("li"); li.className = "p-3 hover:bg-slate-50 cursor-pointer border-b flex justify-between text-xs";
+                li.innerHTML = `<span>${i.name}</span><span class="text-[10px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded">${i.category}</span>`;
+                li.onclick = () => showNewProductForm(i.name, i.category, i.defaultCost, i.defaultPrice);
+                box.appendChild(li);
+            });
+            const customLi = document.createElement("li"); customLi.className = "p-3 bg-amber-50 cursor-pointer font-bold text-amber-800 text-center text-xs";
+            customLi.innerHTML = `<i class="fa-solid fa-plus mr-1"></i> '${q}' 직접 등록`; customLi.onclick = () => showNewProductForm(q, "");
+            box.appendChild(customLi);
+            box.classList.remove("hidden");
+        }
+
+        function showNewProductForm(name, cat, cost="", price="") {
+            document.getElementById("searchResults").classList.add("hidden");
+            document.getElementById("newProductName").value = name;
+            document.getElementById("newProductCategory").value = cat || "일반";
+            document.getElementById("newProductCost").value = cost ? cost.toLocaleString() : "";
+            document.getElementById("newProductPrice").value = price ? price.toLocaleString() : "";
+            
+            const today = getLocalIsoDate();
+            document.getElementById("newProductOrderDate").value = today;
+            const exp = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+            document.getElementById("newProductExpiryDate").value = exp;
+            
+            document.getElementById("newProductForm").classList.remove("hidden");
+        }
+
+        function registerCustomProduct() {
+            const name = document.getElementById("newProductName").value.trim();
+            const costStr = document.getElementById("newProductCost").value.replace(/,/g, '');
+            const priceStr = document.getElementById("newProductPrice").value.replace(/,/g, '');
+            const cost = parseInt(costStr, 10);
+            const price = parseInt(priceStr, 10);
+            
+            if (!name || isNaN(cost) || isNaN(price)) return alert("금액을 숫자로 정확히 입력하세요.");
+            
+            const orderDate = document.getElementById("newProductOrderDate").value || getLocalIsoDate();
+            const expiryDate = document.getElementById("newProductExpiryDate").value || getLocalIsoDate();
+            
+            const id = "CUST_" + Date.now();
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
+            if (!inv[currentLoggedInEmail]) inv[currentLoggedInEmail] = {};
+
+            inv[currentLoggedInEmail][id] = { 
+                name, category: document.getElementById("newProductCategory").value, 
+                cost, price, stock: 0, 
+                expiryDays: 7, expiryDate: expiryDate, lastRestockDate: orderDate,
+                inputTime: Date.now(), totalSold: 0 
+            };
+            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            
+            alert("등록 완료! 아래 목록에서 수량을 조절하세요.");
+            document.getElementById("newProductForm").classList.add("hidden"); 
+            document.getElementById("searchInput").value = "";
+            refreshDashboard();
+        }
+
+        function updateItemDate(id, field, val) {
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
+            inv[currentLoggedInEmail][id][field] = val;
+            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+        }
+
+        function directAdjustStock(itemId, action) {
+            const amtStr = prompt(action === 'add' ? "간편 입고 수량:" : action === 'sub' ? "간편 출고/폐기 수량:" : "변경 재고량:");
+            if(amtStr === null) return; const amt = parseInt(amtStr, 10); if(isNaN(amt) || amt < 0) return;
+
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"));
+            let item = inv[currentLoggedInEmail][itemId];
+
+            if(action === 'add') { 
+                item.stock += amt; 
+                item.lastRestockDate = getLocalIsoDate();
+                sales[currentLoggedInEmail].orderExpense += (item.cost * amt); 
+            }
+            else if(action === 'sub') { if(item.stock < amt) return alert("재고 부족"); item.stock -= amt; }
+            else { item.stock = amt; }
+
+            inv[currentLoggedInEmail][itemId] = item;
+            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
+            refreshDashboard();
+        }
+
+        function directSetStock(id, valStr) {
+            const val = parseInt(valStr.replace(/,/g,''), 10);
+            if(isNaN(val) || val < 0) return refreshDashboard(); 
+            
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"));
+            let item = inv[currentLoggedInEmail][id];
+            
+            const diff = val - item.stock;
+            if (diff > 0) {
+                if (!sales[currentLoggedInEmail]) sales[currentLoggedInEmail] = { orderExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} };
+                sales[currentLoggedInEmail].orderExpense += (item.cost * diff);
+                item.lastRestockDate = getLocalIsoDate();
+                localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
+            }
+            item.stock = val;
+            inv[currentLoggedInEmail][id] = item;
+            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            refreshDashboard();
+        }
+
+        // ==========================================
+        // ★ 과거 보정 가능한 판매 정산 모달
+        // ==========================================
+        function openBatchSaleModal(id) {
+            batchTargetItemId = id;
+            document.getElementById("batchModalTitle").innerText = `판매 정산 (과거 보정가능)`;
+            document.getElementById("batchSaleDate").value = getLocalIsoDate();
+            document.getElementById("batchSaleInput").value = "";
+            document.getElementById("batchSaleModal").classList.remove("hidden");
+        }
+        function closeBatchSaleModal() { document.getElementById("batchSaleModal").classList.add("hidden"); }
+
+        function confirmBatchSale() {
+            const qStr = document.getElementById("batchSaleInput").value.replace(/,/g, '');
+            const q = parseInt(qStr, 10);
+            const dateStr = document.getElementById("batchSaleDate").value;
+            if (isNaN(q) || q <= 0 || !dateStr) return alert("수량과 날짜 확인");
+            
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {};
+            let item = inv[currentLoggedInEmail][batchTargetItemId];
+            
+            if (item.stock < q) return alert("현재고 초과!");
+            item.stock -= q; item.totalSold = (item.totalSold || 0) + q;
+            inv[currentLoggedInEmail][batchTargetItemId] = item;
+            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            
+            if (!sales[currentLoggedInEmail].history) sales[currentLoggedInEmail].history = [];
+            const rev = item.price * q;
+            sales[currentLoggedInEmail].history.unshift({ 
+                historyId: "S_" + Date.now(), itemId: batchTargetItemId, name: item.name, 
+                qty: q, rev, date: dateStr, time: new Date().toLocaleTimeString() 
+            });
+            const d = new Date(dateStr); const days = ['일','월','화','수','목','금','토'];
+            sales[currentLoggedInEmail].weekdaySales[days[d.getDay()]] += q;
+            localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
+            
+            closeBatchSaleModal(); refreshDashboard(); alert("반영 완료!");
+        }
+
+        // ==========================================
+        // ★ 통계: 일자별, 월별 품목, 특정 요일 품목
+        // ==========================================
+        function renderDailyDetailedStats() {
+            const targetDate = document.getElementById("statsDatePicker").value;
+            const list = document.getElementById("dailyDetailedStatsList");
+            const summary = document.getElementById("dailyTotalSummary");
+            if(!list || !summary) return; list.innerHTML = "";
+            
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"))[currentLoggedInEmail] || { history: [] };
+            const dailyData = {}; let dRev = 0, dQty = 0;
+            
+            if(sales.history) {
+                sales.history.forEach(h => {
+                    const rDate = h.date || getLocalIsoDate();
+                    if (rDate === targetDate) {
+                        if (!dailyData[h.itemId]) dailyData[h.itemId] = { name: h.name, qty: 0, rev: 0 };
+                        dailyData[h.itemId].qty += h.qty; dailyData[h.itemId].rev += h.rev;
+                        dQty += h.qty; dRev += h.rev;
+                    }
+                });
+            }
+
+            summary.innerHTML = `<span class="font-bold text-emerald-900 text-xs">총 ${dQty.toLocaleString()}개 판매</span><span class="font-extrabold text-indigo-700 text-sm">매출 ₩${dRev.toLocaleString()}</span>`;
+
+            if (Object.keys(dailyData).length === 0) {
+                list.innerHTML = `<p class="text-slate-400 text-center py-6">이 날짜의 판매 내역이 없습니다.</p>`;
+                return;
+            }
+
+            for (let id in dailyData) {
+                list.innerHTML += `<div class="flex justify-between items-center bg-white p-3 rounded-xl border shadow-2xs mb-1.5"><span class="font-bold text-slate-800">${dailyData[id].name}</span><div class="text-right"><span class="text-indigo-600 font-bold mr-2">${dailyData[id].qty.toLocaleString()}개</span><span class="text-slate-500 font-medium">₩${dailyData[id].rev.toLocaleString()}</span></div></div>`;
+            }
+        }
+
+        function renderMonthlyItemStats() {
+            const targetMonth = document.getElementById("statsMonthPicker").value;
+            const list = document.getElementById("monthlyItemStatsList");
+            if(!list) return; list.innerHTML = "";
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"))[currentLoggedInEmail] || { history: [] };
+            
+            const data = {}; let tQty = 0, tRev = 0;
+            sales.history.forEach(h => {
+                const rMonth = (h.date || getLocalIsoDate()).substring(0, 7);
+                if (rMonth === targetMonth) {
+                    if (!data[h.itemId]) data[h.itemId] = { name: h.name, qty: 0, rev: 0 };
+                    data[h.itemId].qty += h.qty; data[h.itemId].rev += h.rev;
+                    tQty += h.qty; tRev += h.rev;
+                }
+            });
+
+            if (Object.keys(data).length === 0) {
+                list.innerHTML = `<p class="text-slate-400 text-center py-4">해당 월의 데이터가 없습니다.</p>`;
+                return;
+            }
+
+            list.innerHTML += `<div class="bg-blue-50 p-3 rounded-xl mb-3 flex justify-between items-center font-bold text-blue-900 text-xs"><span>총 ${tQty.toLocaleString()}개 판매</span><span class="text-sm">₩${tRev.toLocaleString()}</span></div>`;
+
+            Object.values(data).sort((a,b)=>b.rev-a.rev).forEach((item, idx) => {
+                list.innerHTML += `<div class="flex justify-between items-center bg-white p-3 rounded-xl border shadow-2xs mb-1.5"><span class="font-bold text-slate-800"><span class="text-blue-600 mr-1">${idx+1}.</span>${item.name}</span><div class="text-right"><span class="text-indigo-600 font-bold mr-2">${item.qty.toLocaleString()}개</span><span class="text-slate-500 font-medium">₩${item.rev.toLocaleString()}</span></div></div>`;
+            });
+        }
+
+        function renderWeekdayItemStats() {
+            const targetWd = document.getElementById("statsWeekdayPicker").value;
+            const list = document.getElementById("weekdayItemStatsList");
+            if(!list) return; list.innerHTML = "";
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"))[currentLoggedInEmail] || { history: [] };
+            
+            const data = {}; let tQty = 0, tRev = 0;
+            const days = ['일','월','화','수','목','금','토'];
+            
+            sales.history.forEach(h => {
+                const hWd = days[new Date(h.date || getLocalIsoDate()).getDay()];
+                if (hWd === targetWd) {
+                    if (!data[h.itemId]) data[h.itemId] = { name: h.name, qty: 0, rev: 0 };
+                    data[h.itemId].qty += h.qty; data[h.itemId].rev += h.rev;
+                    tQty += h.qty; tRev += h.rev;
+                }
+            });
+
+            if (Object.keys(data).length === 0) {
+                list.innerHTML = `<p class="text-slate-400 text-center py-4">해당 요일의 데이터가 없습니다.</p>`;
+                return;
+            }
+
+            list.innerHTML += `<div class="bg-purple-50 p-3 rounded-xl mb-3 flex justify-between items-center font-bold text-purple-900 text-xs"><span>누적 ${tQty.toLocaleString()}개 판매</span><span class="text-sm">₩${tRev.toLocaleString()}</span></div>`;
+
+            Object.values(data).sort((a,b)=>b.rev-a.rev).forEach((item, idx) => {
+                list.innerHTML += `<div class="flex justify-between items-center bg-white p-3 rounded-xl border shadow-2xs mb-1.5"><span class="font-bold text-slate-800"><span class="text-purple-600 mr-1">${idx+1}.</span>${item.name}</span><div class="text-right"><span class="text-indigo-600 font-bold mr-2">${item.qty.toLocaleString()}개</span><span class="text-slate-500 font-medium">₩${item.rev.toLocaleString()}</span></div></div>`;
+            });
+        }
+
+        function renderWeekdayStats() {
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {};
+            const mySale = sales[currentLoggedInEmail] || { history: [] };
+            let wd = {'일':{q:0,r:0}, '월':{q:0,r:0}, '화':{q:0,r:0}, '수':{q:0,r:0}, '목':{q:0,r:0}, '금':{q:0,r:0}, '토':{q:0,r:0}};
+            const days = ['일', '월', '화', '수', '목', '금', '토'];
+
+            if (mySale.history) {
+                mySale.history.forEach(h => {
+                    const dStr = h.date || getLocalIsoDate();
+                    const dIdx = new Date(dStr).getDay();
+                    wd[days[dIdx]].q += h.qty; wd[days[dIdx]].r += h.rev;
+                });
+            }
+
+            const grid = document.getElementById("weekdayStatsGrid");
+            if (!grid) return; grid.innerHTML = "";
+
+            days.forEach(d => {
+                const rDisplay = wd[d].r > 0 ? (wd[d].r >= 10000 ? (wd[d].r/10000).toFixed(1) + '만' : wd[d].r.toLocaleString()) : '0';
+                grid.innerHTML += `<div class="bg-slate-50 p-2 rounded-xl border flex flex-col justify-between h-full"><span class="text-[11px] text-slate-500 font-bold">${d}</span><b class="text-xs text-indigo-600">${wd[d].q.toLocaleString()}개</b><span class="text-[10px] text-emerald-600 font-extrabold break-keep">₩${rDisplay}</span></div>`;
+            });
+        }
+
+        function calculateSmartOrder(item) {
+            const sold = item.totalSold || 0;
+            const days = Math.max(1, Math.floor((Date.now() - (item.inputTime || Date.now())) / (1000 * 60 * 60 * 24)));
+            const daily = (sold / days) > 0 ? (sold / days) : 1;
+            let w = Math.ceil((daily * 7) - item.stock);
+            if (w < 0 || item.stock >= (daily * 5)) w = 0;
+            return { weeklyNeeded: w, effectiveDaily: daily };
+        }
+
+        function renderBestSellers(myInv) {
+            const c = document.getElementById("bestSellerList");
+            if (!c) return; c.innerHTML = "";
+            const sorted = Object.values(myInv).filter(i => i.totalSold > 0).sort((a,b) => b.totalSold - a.totalSold).slice(0, 3);
+            if (sorted.length === 0) { c.innerHTML = `<p class="text-xs text-slate-400">판매 데이터가 쌓이면 베스트 품목이 표시됩니다.</p>`; return; }
+            sorted.forEach((item, idx) => {
+                const so = calculateSmartOrder(item);
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
+                c.innerHTML += `<div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border text-xs mb-1.5"><div><span class="text-base mr-1">${medal}</span> <b class="text-slate-800">${item.name}</b></div><div class="text-right"><span class="text-rose-600 font-bold block">현재고 ${item.stock.toLocaleString()}개</span><span class="text-indigo-600 font-bold">주간추천 ${so.weeklyNeeded.toLocaleString()}개</span></div></div>`;
+            });
+        }
+
+        function renderMyInventory() {
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58")) || {};
+            const myInv = inv[currentLoggedInEmail] || {};
+            const c = document.getElementById("myInventoryList");
+            c.innerHTML = ""; let has = false;
+            for (let k in myInv) {
+                has = true; const item = myInv[k]; const so = calculateSmartOrder(item);
+                let badge = item.stock === 0 ? `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded font-extrabold">🚨 품절</span>` :
+                            item.stock < so.effectiveDaily * 3 ? `<span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold">⚠️ 임박</span>` :
+                            `<span class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-bold">✅ 여유</span>`;
+
+                c.innerHTML += `
+                    <div class="p-4 border rounded-2xl bg-white space-y-3 text-xs shadow-sm">
+                        <div class="flex justify-between items-center">
+                            <div><b class="text-sm text-slate-900">${item.name}</b> <span class="text-[10px] text-slate-400 ml-1">단가 ₩${item.price.toLocaleString()}</span></div>
+                        </div>
+                        
+                        <div class="bg-amber-50 p-2 rounded-lg border border-amber-100 grid grid-cols-2 gap-2 text-[10px] mt-1 mb-1">
+                            <label class="flex flex-col text-amber-800 font-semibold">📦 최근 입고일 <input type="date" value="${item.lastRestockDate || ''}" onchange="updateItemDate('${k}', 'lastRestockDate', this.value)" class="mt-0.5 p-1 rounded bg-white border border-amber-200 focus:outline-none"></label>
+                            <label class="flex flex-col text-rose-600 font-bold">⏳ 소비기한 <input type="date" value="${item.expiryDate || ''}" onchange="updateItemDate('${k}', 'expiryDate', this.value)" class="mt-0.5 p-1 rounded bg-white border border-rose-200 focus:outline-none"></label>
+                        </div>
+                        
+                        <div class="flex items-center gap-2 pt-1">
+                            <button onclick="directAdjustStock('${k}', 'sub')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200 transition">-</button>
+                            <input type="text" id="quickStock_${k}" value="${item.stock.toLocaleString()}" onchange="directSetStock('${k}', this.value)" class="w-16 h-8 border border-slate-300 rounded-lg text-center text-sm font-bold bg-white focus:outline-none focus:border-indigo-600">
+                            <button onclick="directAdjustStock('${k}', 'add')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200 transition">+</button>
+                            <div class="flex-1 flex justify-end gap-1.5">
+                                <button onclick="openBatchSaleModal('${k}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg shadow transition">정산</button>
+                                <button onclick="deleteProduct('${k}')" class="bg-rose-50 text-rose-600 font-bold px-3 py-1.5 rounded-lg border border-rose-200"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">${badge} <span class="text-slate-500">주간 권장발주: <b>${so.weeklyNeeded.toLocaleString()}개</b></span></div>
+                    </div>`;
+            }
+            if (!has) c.innerHTML = `<p class="text-slate-400 text-center py-6">보유 중인 상품이 없습니다.</p>`;
+            renderBestSellers(myInv);
+        }
+
+        function deleteProduct(id) {
+            if(!confirm("상품 목록에서 완전히 삭제하시겠습니까?")) return;
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
+            delete inv[currentLoggedInEmail][id];
+            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            refreshDashboard();
+        }
+
+        // ==========================================
+        // ★ 관리자(본사) 관제탑 패널
+        // ==========================================
+        function renderAdminDashboard() {
+            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+            const allSales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {};
+            const container = document.getElementById("adminUserList");
+            container.innerHTML = "";
+            let count = 0;
+            for (let id in users) {
+                if (users[id].role === "owner") {
+                    count++;
+                    const u = users[id];
+                    const sale = allSales[id] || { revenue: 0, orderExpense: 0, wasteExpense: 0 };
+                    const net = sale.revenue - sale.orderExpense - sale.wasteExpense;
+                    
+                    container.innerHTML += `
+                        <div class="p-4 border rounded-2xl bg-white shadow-2xs space-y-2 text-xs mb-3">
+                            <div class="flex justify-between items-center border-b pb-2 mb-2">
+                                <b class="text-sm text-slate-900">${u.name}</b> 
+                                <span class="bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-lg">코드: ${u.storeCode}</span>
+                            </div>
+                            <p class="text-slate-500">대표: ${u.ownerName} | ${u.phone} | 업종: ${u.businessType}</p>
+                            <div class="bg-slate-50 p-2 rounded-xl grid grid-cols-2 gap-2 text-center mt-2">
+                                <div><span class="block text-[10px] text-slate-400">총매출</span><b class="text-slate-800">₩${sale.revenue.toLocaleString()}</b></div>
+                                <div><span class="block text-[10px] text-slate-400">순수익</span><b class="text-emerald-600">₩${net.toLocaleString()}</b></div>
+                            </div>
+                            <div class="flex gap-2 pt-2">
+                                <button onclick="openStoreInventory('${id}')" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl font-bold shadow">장부/엑셀 상세조회</button>
+                                <button onclick="deleteUser('${id}')" class="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl border border-rose-100 font-bold"><i class="fa-solid fa-trash"></i> 삭제</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            if(count === 0) container.innerHTML = `<p class="text-center text-slate-400 py-6">등록된 가맹점이 없습니다.</p>`;
+        }
+
+        function deleteUser(id) {
+            if (!confirm("해당 가맹점 계정과 데이터를 완전히 삭제하시겠습니까? 복구할 수 없습니다.")) return;
+            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58"));
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"));
+            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            
+            delete users[id];
+            if(inv[id]) delete inv[id];
+            if(sales[id]) delete sales[id];
+            for(let staffEmail in staffs) { if(staffs[staffEmail].ownerEmail === id) delete staffs[staffEmail]; }
+
+            localStorage.setItem("smart_stock_users_v58", JSON.stringify(users));
+            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
+            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+            renderAdminDashboard();
+        }
+
+        function openStoreInventory(id) {
+            currentAdminModalUserId = id;
+            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58"));
+            const allInventories = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
+            const allSales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"));
+            
+            document.getElementById("modalStoreName").innerText = users[id].name;
+            document.getElementById("modalStoreInfo").innerText = `${users[id].ownerName} / ${users[id].businessType}`;
+            document.getElementById("modalRevenue").innerText = `₩ ${(allSales[id]?.revenue || 0).toLocaleString()}`;
+            document.getElementById("modalCost").innerText = `₩ ${(allSales[id]?.orderExpense || 0).toLocaleString()}`;
+            document.getElementById("modalProfit").innerText = `₩ ${((allSales[id]?.revenue || 0) - (allSales[id]?.orderExpense || 0)).toLocaleString()}`;
+            
+            const list = document.getElementById("modalInventoryList");
+            list.innerHTML = "";
+            const inv = allInventories[id] || {};
+            let hasItem = false;
+            for (let k in inv) {
+                hasItem = true;
+                list.innerHTML += `<div class="bg-white p-3 rounded-xl border flex justify-between text-xs mb-1.5 shadow-2xs"><span><b class="text-slate-800">${inv[k].name}</b><br><span class="text-[10px] text-slate-400">원가: ₩${inv[k].cost.toLocaleString()} / 판매가: ₩${inv[k].price.toLocaleString()}</span></span><span class="font-extrabold text-indigo-600">${inv[k].stock.toLocaleString()}개</span></div>`;
+            }
+            if(!hasItem) list.innerHTML = `<p class="text-center text-slate-400 py-4 text-xs">등록된 재고가 없습니다.</p>`;
+            document.getElementById("storeInventoryModal").classList.remove("hidden");
+        }
+        function closeStoreInventory() { document.getElementById("storeInventoryModal").classList.add("hidden"); currentAdminModalUserId = null; }
+
+        function exportAdminToCSV() {
+            if (!currentAdminModalUserId) return;
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58")) || {};
+            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+            const storeName = users[currentAdminModalUserId]?.name || "가맹점";
+            const myInv = inv[currentAdminModalUserId] || {};
+            let csvContent = "\uFEFF" + `[관제탑] ${storeName} 재고/매출 장부\n상품명,카테고리,현재고,원가,판매가,총판매량\n`;
+            for (let k in myInv) { csvContent += `"${myInv[k].name}","${myInv[k].category}",${myInv[k].stock},${myInv[k].cost},${myInv[k].price},${myInv[k].totalSold||0}\n`; }
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${storeName}_장부_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        // ==========================================
+        // 구독 및 엑셀 일반
+        // ==========================================
+        function openSubscriptionModal() { document.getElementById("subscriptionModal").classList.remove("hidden"); }
+        function closeSubscriptionModal() { document.getElementById("subscriptionModal").classList.add("hidden"); }
+        function payMonthlySubscription() {
+            const subs = JSON.parse(localStorage.getItem("smart_stock_subs_v58")) || {};
+            subs[currentLoggedInEmail] = { active: true, date: new Date().toLocaleDateString() };
+            localStorage.setItem("smart_stock_subs_v58", JSON.stringify(subs));
+            closeSubscriptionModal(); refreshDashboard(); alert("🎉 PRO 멤버십 결제가 완료되었습니다!");
+        }
+
+        function refreshDashboard() {
+            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {};
+            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58")) || {};
+            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+            const subs = JSON.parse(localStorage.getItem("smart_stock_subs_v58")) || {};
+            const currentUser = users[currentLoggedInEmail];
+
+            if (currentUser && currentUser.role === "owner") {
+                document.getElementById("storeInviteCodeDisplay").innerText = currentUser.storeCode;
+                document.getElementById("storeInviteCodeDisplay2").innerText = currentUser.storeCode;
+
+                const mySale = sales[currentLoggedInEmail] || { history: [] };
+                let totalRev = 0; let totalOrder = 0; let totalWaste = 0;
+                if(mySale.history) { mySale.history.forEach(h => totalRev += h.rev); }
+                if(inv[currentLoggedInEmail]) {
+                    Object.values(inv[currentLoggedInEmail]).forEach(item => {
+                        totalOrder += (item.cost * (item.stock + item.totalSold)); 
+                    });
+                }
+                
+                document.getElementById("totalNetProfit").innerText = "₩ " + (totalRev - totalOrder - totalWaste).toLocaleString();
+                document.getElementById("totalRevenue").innerText = "₩ " + totalRev.toLocaleString();
+                document.getElementById("totalOrderExpense").innerText = "₩ " + totalOrder.toLocaleString();
+                
+                let tq=0, tr=0; const todayStr = getLocalIsoDate();
+                if (mySale.history) {
+                    mySale.history.forEach(h => {
+                        const recDate = h.date || todayStr;
+                        if(recDate === todayStr) { tq+=h.qty; tr+=h.rev; }
+                    });
+                }
+                document.getElementById("todaySoldSummaryText").innerText = `${tq.toLocaleString()}개 (₩${tr.toLocaleString()})`;
+
+                const isPro = subs[currentLoggedInEmail]?.active;
+                const proPitchBanner = document.getElementById("proPitchBanner");
+                if (isPro) {
+                    if(proPitchBanner) proPitchBanner.classList.add("hidden");
+                } else {
+                    if(proPitchBanner) proPitchBanner.classList.remove("hidden");
+                }
+
+                renderMyInventory();
+                renderWeekdayStats();
+                if(!document.getElementById("tabContentStats").classList.contains("hidden")) {
+                    renderDailyDetailedStats(); renderMonthlyItemStats(); renderWeekdayItemStats();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
