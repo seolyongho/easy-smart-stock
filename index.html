@@ -575,42 +575,54 @@
         // ==========================================
         // ★ 앱 시작 시 Firebase 동기화 로직
         // ==========================================
-        document.addEventListener("DOMContentLoaded", () => {
-            db.collection("easy_smart_stock").onSnapshot((snapshot) => {
-                if (snapshot.empty) {
-                    saveToDB('users', {"seolyh0328": { role: "admin", password: "yongho0229!", name: "총괄 본사", storeCode: "ADMIN" }});
-                    saveToDB('inventory', {}); saveToDB('sales', {}); saveToDB('staffs', {}); saveToDB('schedules', {}); saveToDB('subs', {});
-                } else {
-                    snapshot.forEach(doc => { globalData[doc.id] = doc.data(); });
-                }
-
-                if (!isFirebaseInitialized) {
-                    isFirebaseInitialized = true;
-                    executeMigration();
-                    document.getElementById('firebaseLoading').classList.add('hidden');
-                    initSystem(); 
-                } else {
-                    if (currentLoggedInEmail) {
-                        if (selectedRole === 'owner') {
-                            refreshDashboard();
-                            renderOwnerStaffList();
-                            if(currentCalendarTargetStaff && !document.getElementById("ownerCalendarModal").classList.contains("hidden")) {
-                                renderCalendar('ownerCalendarContainer', currentCalendarTargetStaff, 'owner');
-                            }
-                        } else if (selectedRole === 'staff') {
-                            const staffData = globalData.staffs[currentLoggedInEmail];
-                            if (staffData) updateStaffUI(staffData);
-                        } else if (selectedRole === 'admin') {
-                            renderAdminDashboard();
-                            // 관리자 장부 모달이 켜져있을 경우 화면 갱신
-                            if(currentAdminModalUserId && !document.getElementById("storeInventoryModal").classList.contains("hidden")) {
-                                openStoreInventory(currentAdminModalUserId);
-                            }
-                        }
-                    }
-                }
-            });
-        });
+document.addEventListener("DOMContentLoaded", () => {
+  // 1. 파이어베이스 공식 로그인 상태 확인
+  firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+      // 2. 로그인이 정상적으로 되어 있을 때만 데이터 실시간 가져오기
+      db.collection("easy_smart_stock").onSnapshot((snapshot) => {
+        if (snapshot.empty) {
+          saveToDB('users', {"seolyh0328": { role: "admin", password: "yongho0229!", name: "총괄 본사", storeCode: "ADMIN" }});
+          saveToDB('inventory', {}); saveToDB('sales', {}); saveToDB('staffs', {}); saveToDB('schedules', {}); saveToDB('subs', {});
+        } else {
+          snapshot.forEach(doc => { globalData[doc.id] = doc.data(); });
+        }
+        
+        if (!isFirebaseInitialized) {
+          isFirebaseInitialized = true;
+          executeMigration(); 
+          document.getElementById('firebaseLoading').classList.add('hidden');
+          initSystem();
+        } else {
+          if (currentLoggedInEmail) {
+            if (selectedRole === 'owner') {
+              refreshDashboard();
+              renderOwnerStaffList();
+              if(currentCalendarTargetStaff && !document.getElementById("ownerCalendarModal").classList.contains("hidden")) {
+                renderCalendar('ownerCalendarContainer', currentCalendarTargetStaff, 'owner');
+              }
+            } else if (selectedRole === 'staff') {
+              const staffData = globalData.staffs[currentLoggedInEmail];
+              if (staffData) updateStaffUI(staffData);
+            } else if (selectedRole === 'admin') {
+              renderAdminDashboard();
+              // 관리자 장부 모달이 켜져있을 경우 화면 갱신
+              if(currentAdminModalUserId && !document.getElementById("storeInventoryModal").classList.contains("hidden")) {
+                openStoreInventory(currentAdminModalUserId);
+              }
+            }
+          }
+        }
+      });
+    } else {
+      // 3. 로그인이 안 되어 있으면 데이터 부르지 말고 무한 로딩창만 바로 끄기!
+      document.getElementById('firebaseLoading').classList.add('hidden');
+      
+      // 만약 로딩창이 꺼졌는데 로그인 화면이 안 뜨고 하얗게만 나오면 아래 줄의 슬래시(//)를 지워줘
+      // initSystem(); 
+    }
+  });
+});
 
         function initSystem() {
             const autoLogin = localStorage.getItem("smart_stock_autologin_v64");
