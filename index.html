@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Easy Smart Stock - 클라우드 실시간 동기화 ERP v61</title>
+    <title>Easy Smart Stock - 클라우드 실시간 동기화 & 복구 ERP v62</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -24,7 +24,7 @@
     <div id="firebaseLoading" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[100]">
         <i class="fa-solid fa-cloud-arrow-down text-indigo-500 text-6xl mb-4 animate-bounce"></i>
         <h2 class="text-white text-xl font-bold">클라우드 서버 연결 중...</h2>
-        <p class="text-slate-400 text-sm mt-2">실시간 데이터베이스 동기화</p>
+        <p class="text-slate-400 text-sm mt-2">실시간 데이터 동기화 및 기존 장부 복구 중</p>
     </div>
 
     <!-- 로그인 화면 -->
@@ -242,7 +242,8 @@
                 <i class="fa-solid fa-store text-indigo-400 mr-2.5 text-lg" id="headerIcon"></i>
                 <span id="headerTitle">스마트 재고 관리</span>
             </div>
-            <button onclick="logout()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl border border-slate-700 font-semibold">로그아웃</button>
+            <!-- ★ 완벽 로그아웃 버튼 -->
+            <button onclick="logout()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl border border-slate-700 font-semibold transition">로그아웃</button>
         </header>
 
         <main class="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4 pb-24">
@@ -470,24 +471,47 @@
             appId: "1:436413309267:web:658e4bdaf6ad7772bb81a6"
         };
         
-        // 파이어베이스 초기화
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 앱의 모든 정보를 담을 중앙 데이터 허브
-        let globalData = {
-            users: {}, inventory: {}, sales: {}, staffs: {}, schedules: {}, subs: {}
-        };
+        let globalData = { users: {}, inventory: {}, sales: {}, staffs: {}, schedules: {}, subs: {} };
         let isFirebaseInitialized = false;
 
-        // Firebase에 데이터를 쓰고 동시에 글로벌 데이터에도 반영하는 핵심 함수
         function saveToDB(collectionKey, dataObj) {
-            globalData[collectionKey] = dataObj; // 로컬 화면 즉시 반영 (빠른 속도)
+            globalData[collectionKey] = dataObj;
             db.collection("easy_smart_stock").doc(collectionKey).set(dataObj).catch(e => console.error("DB 저장 에러:", e));
         }
 
+        // ★ v62: 기존 폰 메모리 데이터를 클라우드로 '자동 복구(마이그레이션)' 하는 특수 코드
+        function executeMigration() {
+            const oldUsers = localStorage.getItem("smart_stock_users_v60") || localStorage.getItem("smart_stock_users_v59") || localStorage.getItem("smart_stock_users_v58");
+            
+            // 기존 데이터가 있고, 아직 한 번도 클라우드로 넘기지 않았다면!
+            if (oldUsers && !localStorage.getItem("migrated_to_v62_cloud")) {
+                console.log("기존 내장 메모리 데이터 -> 구글 클라우드로 복구 시작!");
+                
+                const u = JSON.parse(oldUsers || '{}');
+                const i = JSON.parse(localStorage.getItem("smart_stock_inventory_v60") || localStorage.getItem("smart_stock_inventory_v59") || localStorage.getItem("smart_stock_inventory_v58") || '{}');
+                const s = JSON.parse(localStorage.getItem("smart_stock_sales_v60") || localStorage.getItem("smart_stock_sales_v59") || localStorage.getItem("smart_stock_sales_v58") || '{}');
+                const st = JSON.parse(localStorage.getItem("smart_stock_staffs_v60") || localStorage.getItem("smart_stock_staffs_v59") || localStorage.getItem("smart_stock_staffs_v58") || '{}');
+                const sc = JSON.parse(localStorage.getItem("smart_stock_schedules_v60") || localStorage.getItem("smart_stock_schedules_v59") || localStorage.getItem("smart_stock_schedules_v58") || '{}');
+                const su = JSON.parse(localStorage.getItem("smart_stock_subs_v60") || localStorage.getItem("smart_stock_subs_v59") || localStorage.getItem("smart_stock_subs_v58") || '{}');
+                
+                saveToDB('users', u);
+                saveToDB('inventory', i);
+                saveToDB('sales', s);
+                saveToDB('staffs', st);
+                saveToDB('schedules', sc);
+                saveToDB('subs', su);
+                
+                localStorage.setItem("migrated_to_v62_cloud", "true");
+                alert("🎉 [시스템 알림] 폰 내장 메모리에 있던 기존 '재고' 및 '알바생' 데이터를 구글 클라우드로 완벽하게 복구했습니다!\n다시 로그인 해주세요.");
+                logout(); // 복구 후 깔끔하게 재로그인 시키기
+            }
+        }
+
         // ==========================================
-        // 철통 보안 입력 폼 자동 변환 함수
+        // 철통 보안 & 포맷 & 유틸리티
         // ==========================================
         function autoFormatPhone(obj) {
             let val = obj.value.replace(/[^0-9]/g, ''); 
@@ -496,28 +520,14 @@
             else if (val.length < 8) { obj.value = val.slice(0, 3) + '-' + val.slice(3); } 
             else { obj.value = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11); }
         }
-
-        function autoFormatBirth(obj) {
-            obj.value = obj.value.replace(/[^0-9]/g, '').slice(0, 8);
-        }
-
-        function getLocalIsoDate() {
-            const offset = new Date().getTimezoneOffset() * 60000;
-            return new Date(Date.now() - offset).toISOString().slice(0, 10);
-        }
-
+        function autoFormatBirth(obj) { obj.value = obj.value.replace(/[^0-9]/g, '').slice(0, 8); }
+        function getLocalIsoDate() { const offset = new Date().getTimezoneOffset() * 60000; return new Date(Date.now() - offset).toISOString().slice(0, 10); }
         function formatHM(minutes) {
             if (!minutes || minutes <= 0) return "0분";
             const h = Math.floor(minutes / 60); const m = minutes % 60;
-            if (h > 0 && m > 0) return `${h}시간 ${m}분`;
-            if (h > 0) return `${h}시간`;
-            return `${m}분`;
+            if (h > 0 && m > 0) return `${h}시간 ${m}분`; if (h > 0) return `${h}시간`; return `${m}분`;
         }
-
-        function formatCurrencyInput(input) {
-            let val = input.value.replace(/[^0-9]/g, '');
-            input.value = val ? Number(val).toLocaleString() : '';
-        }
+        function formatCurrencyInput(input) { let val = input.value.replace(/[^0-9]/g, ''); input.value = val ? Number(val).toLocaleString() : ''; }
 
         let selectedRole = "owner";
         let currentLoggedInEmail = null;
@@ -532,34 +542,30 @@
         // ★ 앱 시작 시 Firebase 동기화 로직
         // ==========================================
         document.addEventListener("DOMContentLoaded", () => {
-            // Firebase의 easy_smart_stock 컬렉션을 실시간 감시 (사장님 ↔ 알바생 0.1초 동기화)
             db.collection("easy_smart_stock").onSnapshot((snapshot) => {
                 if (snapshot.empty) {
-                    // 앱 최초 실행 시 빈 방(컬렉션) 만들어주기
                     saveToDB('users', {"seolyh0328": { role: "admin", password: "yongho0229!", name: "총괄 본사", storeCode: "ADMIN" }});
                     saveToDB('inventory', {}); saveToDB('sales', {}); saveToDB('staffs', {}); saveToDB('schedules', {}); saveToDB('subs', {});
                 } else {
                     snapshot.forEach(doc => { globalData[doc.id] = doc.data(); });
                 }
 
-                // 앱 최초 로딩 끝났을 때
                 if (!isFirebaseInitialized) {
                     isFirebaseInitialized = true;
+                    executeMigration(); // ★ 앱 켜지자마자 옛날 데이터 싹 다 클라우드로 쏴버림!
                     document.getElementById('firebaseLoading').classList.add('hidden');
-                    initSystem(); // 자동 로그인 체크 등 실행
+                    initSystem(); 
                 } else {
-                    // 누군가 데이터를 바꿔서 실시간으로 신호가 날아왔을 때 화면 갱신
                     if (currentLoggedInEmail) {
                         if (selectedRole === 'owner') {
                             refreshDashboard();
                             renderOwnerStaffList();
-                            // 만약 사장님이 특정 알바 달력 보고 있으면 그 달력도 실시간 갱신
                             if(currentCalendarTargetStaff && !document.getElementById("ownerCalendarModal").classList.contains("hidden")) {
                                 renderCalendar('ownerCalendarContainer', currentCalendarTargetStaff, 'owner');
                             }
                         } else if (selectedRole === 'staff') {
                             const staffData = globalData.staffs[currentLoggedInEmail];
-                            if (staffData) updateStaffUI(staffData); // 화면만 새로고침 (탭 이동 X)
+                            if (staffData) updateStaffUI(staffData);
                         } else if (selectedRole === 'admin') {
                             renderAdminDashboard();
                         }
@@ -569,7 +575,7 @@
         });
 
         function initSystem() {
-            const autoLogin = localStorage.getItem("smart_stock_autologin_v61");
+            const autoLogin = localStorage.getItem("smart_stock_autologin_v62");
             if (autoLogin) {
                 try {
                     const sd = JSON.parse(autoLogin);
@@ -588,7 +594,7 @@
                         return;
                     }
                 } catch(e) { 
-                    localStorage.removeItem("smart_stock_autologin_v61"); 
+                    localStorage.removeItem("smart_stock_autologin_v62"); 
                 }
             }
             
@@ -598,6 +604,16 @@
                 document.getElementById("statsDatePicker").value = getLocalIsoDate();
                 document.getElementById("statsMonthPicker").value = `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`;
             }
+        }
+
+        // ★ 강력한 로그아웃 버튼 (모든 과거 버전 찌꺼기 완벽 삭제)
+        function logout() {
+            localStorage.removeItem("smart_stock_autologin_v59");
+            localStorage.removeItem("smart_stock_autologin_v60");
+            localStorage.removeItem("smart_stock_autologin_v61");
+            localStorage.removeItem("smart_stock_autologin_v62"); // 최신 버전 삭제
+            currentLoggedInEmail = null;
+            location.reload();
         }
 
         // ==========================================
@@ -768,14 +784,14 @@
                 const staffs = globalData.staffs || {};
                 if (staffs[email] && staffs[email].password === pw) {
                     currentLoggedInEmail = email;
-                    if (remember) localStorage.setItem("smart_stock_autologin_v61", JSON.stringify({ email, pw, role: 'staff' }));
+                    if (remember) localStorage.setItem("smart_stock_autologin_v62", JSON.stringify({ email, pw, role: 'staff' }));
                     enterStaffApp(staffs[email]);
                 } else alert("로그인 실패");
             } else {
                 const users = globalData.users || {};
                 if (users[email] && users[email].role === selectedRole && users[email].password === pw) {
                     currentLoggedInEmail = email;
-                    if (remember) localStorage.setItem("smart_stock_autologin_v61", JSON.stringify({ email, pw, role: selectedRole }));
+                    if (remember) localStorage.setItem("smart_stock_autologin_v62", JSON.stringify({ email, pw, role: selectedRole }));
                     enterApp(users[email]);
                 } else alert("로그인 실패");
             }
@@ -803,7 +819,6 @@
             }
         }
 
-        // 실시간 업데이트 시 화면만 새로고침하는 알바생 함수
         function updateStaffUI(staff) {
             document.getElementById("headerTitle").innerText = `${staff.storeName} 알바 포털`;
             document.getElementById("staffPanelName").innerText = `${staff.name}님 환영합니다!`;
@@ -835,7 +850,6 @@
             updateStaffWorkButtonState(staff);
         }
 
-        // 최초 진입 시 호출
         function enterStaffApp(staff) {
             document.getElementById("loginScreen").classList.add("hidden");
             document.getElementById("appScreen").classList.remove("hidden");
@@ -905,7 +919,7 @@
                 staff.working = false; staff.startTime = null;
                 alert(`퇴근 완료! ${formatHM(mins)} 사장님 승인 대기열 전송.`);
             }
-            saveToDB('staffs', staffs); // 클라우드 동기화!
+            saveToDB('staffs', staffs);
         }
 
         function approveStaffWorkHours() {
@@ -913,7 +927,7 @@
             let staff = staffs[currentLoggedInEmail];
             staff.approvedMinutes = (staff.approvedMinutes || 0) + (staff.pendingMinutes || 0);
             staff.pendingMinutes = 0;
-            saveToDB('staffs', staffs); // 클라우드 동기화!
+            saveToDB('staffs', staffs);
             alert("✅ 근무 시간이 최종 승인되었습니다!");
         }
 
@@ -942,7 +956,7 @@
             const input = prompt(`[${dateStr}] 근무 시간을 자유롭게 적으세요 (예: 09:00~18:00)\n※ 칸을 완전히 비우면 휴무(삭제) 처리됩니다.`, schMap[email][dateStr]||"");
             if (input === null) return;
             if (input.trim() === "") delete schMap[email][dateStr]; else schMap[email][dateStr] = input.trim();
-            saveToDB('schedules', schMap); // 클라우드 동기화!
+            saveToDB('schedules', schMap);
         }
 
         // ==========================================
@@ -1027,7 +1041,7 @@
         }
 
         // ==========================================
-        // ★ 직관적 검색 및 AI 10만+ 도매처 매칭 
+        // ★ 직관적 검색 및 AI 도매처 매칭 
         // ==========================================
         function handleSearch() {
             const q = document.getElementById("searchInput").value.trim();
@@ -1377,9 +1391,6 @@
             saveToDB('inventory', invMap);
         }
 
-        // ==========================================
-        // ★ 관리자(본사) 관제탑 패널
-        // ==========================================
         function renderAdminDashboard() {
             const users = globalData.users || {};
             const allSales = globalData.sales || {};
@@ -1479,16 +1490,13 @@
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
         }
 
-        // ==========================================
-        // 구독 및 엑셀 일반
-        // ==========================================
         function openSubscriptionModal() { document.getElementById("subscriptionModal").classList.remove("hidden"); }
         function closeSubscriptionModal() { document.getElementById("subscriptionModal").classList.add("hidden"); }
         function payMonthlySubscription() {
             let subs = globalData.subs || {};
             subs[currentLoggedInEmail] = { active: true, date: new Date().toLocaleDateString() };
             saveToDB('subs', subs);
-            closeSubscriptionModal(); alert("🎉 PRO 멤버십 결제가 완료되었습니다!");
+            closeSubscriptionModal(); refreshDashboard(); alert("🎉 PRO 멤버십 결제가 완료되었습니다!");
         }
 
         function refreshDashboard() {
