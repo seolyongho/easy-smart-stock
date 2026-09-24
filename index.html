@@ -3,9 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Easy Smart Stock - 스케줄러 버그 픽스 최종 v58</title>
+    <title>Easy Smart Stock - 클라우드 실시간 동기화 ERP v61</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- ★ Firebase SDK 추가 -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
         body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; }
@@ -15,6 +20,13 @@
 </head>
 <body class="text-slate-900">
 
+    <!-- 서버 연동 로딩 화면 -->
+    <div id="firebaseLoading" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[100]">
+        <i class="fa-solid fa-cloud-arrow-down text-indigo-500 text-6xl mb-4 animate-bounce"></i>
+        <h2 class="text-white text-xl font-bold">클라우드 서버 연결 중...</h2>
+        <p class="text-slate-400 text-sm mt-2">실시간 데이터베이스 동기화</p>
+    </div>
+
     <!-- 로그인 화면 -->
     <div id="loginScreen" class="flex flex-col items-center justify-center min-h-screen px-6 py-12 bg-slate-950 hidden">
         <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-800">
@@ -23,19 +35,13 @@
                     <i class="fa-solid fa-layer-group"></i>
                 </div>
                 <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">Easy Smart Stock</h1>
-                <p class="text-slate-500 text-xs mt-1">소상공인 맞춤형 스케줄 & 재고 통합 ERP</p>
+                <p class="text-slate-500 text-xs mt-1">클라우드 실시간 동기화 ERP 시스템</p>
             </div>
 
             <div class="flex rounded-2xl bg-slate-100 p-1 mb-6">
-                <button type="button" id="tabOwner" onclick="switchLoginRole('owner')" class="flex-1 py-3 text-xs font-bold rounded-xl bg-white text-indigo-600 shadow-sm transition">
-                    가맹점 / 사장님
-                </button>
-                <button type="button" id="tabStaff" onclick="switchLoginRole('staff')" class="flex-1 py-3 text-xs font-bold rounded-xl text-slate-500 transition">
-                    알바생(직원)
-                </button>
-                <button type="button" id="tabAdmin" onclick="switchLoginRole('admin')" class="flex-1 py-3 text-xs font-bold rounded-xl text-slate-500 transition">
-                    총괄 본사
-                </button>
+                <button type="button" id="tabOwner" onclick="switchLoginRole('owner')" class="flex-1 py-3 text-xs font-bold rounded-xl bg-white text-indigo-600 shadow-sm transition">가맹점 / 사장님</button>
+                <button type="button" id="tabStaff" onclick="switchLoginRole('staff')" class="flex-1 py-3 text-xs font-bold rounded-xl text-slate-500 transition">알바생(직원)</button>
+                <button type="button" id="tabAdmin" onclick="switchLoginRole('admin')" class="flex-1 py-3 text-xs font-bold rounded-xl text-slate-500 transition">총괄 본사</button>
             </div>
 
             <form onsubmit="handleLogin(event)" class="space-y-4">
@@ -60,180 +66,174 @@
             </form>
 
             <div id="signupPrompt" class="mt-6 text-center space-y-2">
-                <div>
-                    <span class="text-xs text-slate-500">사장님이신가요?</span>
-                    <button type="button" onclick="openSignupModal()" class="text-xs font-bold text-indigo-600 ml-2 hover:underline">가맹점 회원가입</button>
-                </div>
-                <div>
-                    <span class="text-xs text-slate-500">알바생이신가요?</span>
-                    <button type="button" onclick="openStaffSignupModal()" class="text-xs font-bold text-emerald-600 ml-2 hover:underline">알바생 회원가입</button>
-                </div>
+                <div><span class="text-xs text-slate-500">사장님이신가요?</span><button type="button" onclick="openSignupModal()" class="text-xs font-bold text-indigo-600 ml-2 hover:underline">가맹점 회원가입</button></div>
+                <div><span class="text-xs text-slate-500">알바생이신가요?</span><button type="button" onclick="openStaffSignupModal()" class="text-xs font-bold text-emerald-600 ml-2 hover:underline">알바생 회원가입</button></div>
             </div>
         </div>
     </div>
 
-    <!-- 모달 컨테이너 (중복 없는 유일한 모달들) -->
-    
-    <!-- 계정 찾기 모달 -->
-    <div id="findAccountModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
-            <div class="flex justify-between items-center border-b pb-3">
-                <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-magnifying-glass mr-2 text-indigo-600"></i>계정 찾기</h3>
-                <button onclick="closeFindAccountModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            <form onsubmit="findAccount(event)" class="space-y-3">
-                <select id="findRole" class="w-full border rounded-xl p-3 text-sm focus:outline-none">
-                    <option value="owner">사장님(가맹점) 계정</option>
-                    <option value="staff">알바생(직원) 계정</option>
-                </select>
-                <input type="text" id="findName" required class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="이름 (대표자명 또는 직원명)">
-                <input type="tel" id="findPhone" required class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="전화번호 (예: 010-0000-0000)">
-                <input type="text" id="findBirth" required maxlength="8" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="생년월일 8자리 (예: 19900101)">
-                <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow transition">계정 정보 조회</button>
-            </form>
-            <div id="findResult" class="text-center bg-slate-50 p-4 rounded-xl min-h-[70px] flex items-center justify-center border border-slate-100">
-                <span class="text-xs text-slate-400">가입 시 입력한 정보를 바탕으로 조회합니다.</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- 사장님 회원가입 모달 -->
-    <div id="signupModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
-            <div class="bg-indigo-600 p-6 flex justify-between items-center text-white shrink-0">
-                <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-plus mr-2"></i>가맹점 회원가입</h3>
-                <button onclick="closeSignupModal()" class="text-indigo-200 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            <form onsubmit="handleSignup(event)" class="p-6 space-y-4 overflow-y-auto no-scrollbar">
-                <div><label class="block text-xs font-semibold mb-1">상호명</label><input type="text" id="signupName" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
-                <div>
-                    <label class="block text-xs font-semibold mb-1">업종 선택 (200+ 업종)</label>
-                    <select id="signupBusinessType" class="w-full border rounded-2xl p-3.5 text-sm bg-white">
-                        <option value="숙성고깃집/삼겹살">숙성 고깃집 / 삼겹살 전문점</option>
-                        <option value="컵밥/덮밥전문점">테이크아웃 컵밥 / 덮밥 전문점</option>
-                        <option value="디저트카페">감성 베이커리 / 디저트 카페</option>
-                        <option value="동네식자재마트">동네 식자재 마트 / 편의점</option>
-                        <option value="의류/잡화샵">소규모 의류 / 소품 잡화 샵</option>
-                        <option value="기타일반업종">기타 일반 업종</option>
+    <!-- 모달 컨테이너 -->
+    <div id="modalContainer">
+        <!-- 계정 찾기 모달 -->
+        <div id="findAccountModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-magnifying-glass mr-2 text-indigo-600"></i>계정 찾기</h3>
+                    <button onclick="closeFindAccountModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <form onsubmit="findAccount(event)" class="space-y-3">
+                    <select id="findRole" class="w-full border rounded-xl p-3 text-sm focus:outline-none">
+                        <option value="owner">사장님(가맹점) 계정</option>
+                        <option value="staff">알바생(직원) 계정</option>
                     </select>
+                    <input type="text" id="findName" required class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="이름 (대표자명 또는 직원명)">
+                    <input type="tel" id="findPhone" required inputmode="numeric" oninput="autoFormatPhone(this)" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="전화번호 숫자만 (예: 01012345678)">
+                    <input type="text" id="findBirth" required maxlength="8" inputmode="numeric" oninput="autoFormatBirth(this)" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="생년월일 숫자 8자리 (예: 19900101)">
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl shadow transition">계정 정보 조회</button>
+                </form>
+                <div id="findResult" class="text-center bg-slate-50 p-4 rounded-xl min-h-[70px] flex items-center justify-center border border-slate-100">
+                    <span class="text-xs text-slate-400">가입 시 입력한 정보를 바탕으로 조회합니다.</span>
                 </div>
-                <div><label class="block text-xs font-semibold mb-1">대표자 성함</label><input type="text" id="signupOwnerName" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
-                <div><label class="block text-xs font-semibold mb-1">생년월일 8자리 (계정 찾기용)</label><input type="text" id="signupBirth" required maxlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="예: 19801225"></div>
-                <div><label class="block text-xs font-semibold mb-1">대표 전화번호</label><input type="tel" id="signupPhone" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="010-0000-0000"></div>
-                <div>
-                    <label class="block text-xs font-semibold mb-1">아이디</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="signupEmail" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30">
-                        <button type="button" onclick="checkIdDuplicate()" class="bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs shrink-0">중복확인</button>
+            </div>
+        </div>
+
+        <!-- 사장님 회원가입 모달 -->
+        <div id="signupModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
+                <div class="bg-indigo-600 p-6 flex justify-between items-center text-white shrink-0">
+                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-plus mr-2"></i>가맹점 회원가입</h3>
+                    <button onclick="closeSignupModal()" class="text-indigo-200 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <form onsubmit="handleSignup(event)" class="p-6 space-y-4 overflow-y-auto no-scrollbar">
+                    <div><label class="block text-xs font-semibold mb-1">상호명</label><input type="text" id="signupName" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">업종 선택 (200+ 업종)</label>
+                        <select id="signupBusinessType" class="w-full border rounded-2xl p-3.5 text-sm bg-white">
+                            <option value="숙성고깃집/삼겹살">숙성 고깃집 / 삼겹살 전문점</option>
+                            <option value="컵밥/덮밥전문점">테이크아웃 컵밥 / 덮밥 전문점</option>
+                            <option value="디저트카페">감성 베이커리 / 디저트 카페</option>
+                            <option value="동네식자재마트">동네 식자재 마트 / 편의점</option>
+                            <option value="의류/잡화샵">소규모 의류 / 소품 잡화 샵</option>
+                            <option value="기타일반업종">기타 일반 업종</option>
+                        </select>
                     </div>
-                    <span id="idCheckMsg" class="text-[11px] mt-1 block"></span>
+                    <div><label class="block text-xs font-semibold mb-1">대표자 성함</label><input type="text" id="signupOwnerName" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
+                    <div><label class="block text-xs font-semibold mb-1">생년월일 8자리 (계정 찾기용)</label><input type="text" id="signupBirth" required maxlength="8" inputmode="numeric" oninput="autoFormatBirth(this)" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="숫자만 8자리 (예: 19801225)"></div>
+                    <div><label class="block text-xs font-semibold mb-1">대표 전화번호</label><input type="tel" id="signupPhone" required inputmode="numeric" oninput="autoFormatPhone(this)" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="010-0000-0000"></div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1">아이디</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="signupEmail" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30">
+                            <button type="button" onclick="checkIdDuplicate()" class="bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs shrink-0">중복확인</button>
+                        </div>
+                        <span id="idCheckMsg" class="text-[11px] mt-1 block"></span>
+                    </div>
+                    <div><label class="block text-xs font-semibold mb-1">비밀번호 (8자리 이상)</label><input type="password" id="signupPw" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
+                    <div><label class="block text-xs font-semibold mb-1">비밀번호 확인</label><input type="password" id="signupPwConfirm" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
+                    <div class="pt-2 flex gap-2">
+                        <button type="button" onclick="closeSignupModal()" class="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
+                        <button type="submit" class="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl text-sm">가입 완료</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 알바생 회원가입 모달 -->
+        <div id="staffSignupModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
+                <div class="bg-emerald-600 p-6 flex justify-between items-center text-white shrink-0">
+                    <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-clock mr-2"></i>알바생 무료 회원가입</h3>
+                    <button onclick="closeStaffSignupModal()" class="text-emerald-200 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
                 </div>
-                <div><label class="block text-xs font-semibold mb-1">비밀번호 (8자리 이상)</label><input type="password" id="signupPw" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
-                <div><label class="block text-xs font-semibold mb-1">비밀번호 확인</label><input type="password" id="signupPwConfirm" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30"></div>
-                <div class="pt-2 flex gap-2">
-                    <button type="button" onclick="closeSignupModal()" class="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
-                    <button type="submit" class="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl text-sm">가입 완료</button>
+                <form onsubmit="handleStaffSignup(event)" class="p-6 space-y-4 overflow-y-auto no-scrollbar">
+                    <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-xs text-emerald-800">💡 사장님께 받은 <b>매장 고유 4자리 코드</b>를 정확히 입력하세요.</div>
+                    <div><label class="block text-xs font-semibold mb-1">매장 4자리 코드</label><input type="text" id="staffStoreCode" required class="w-full border rounded-2xl p-3.5 text-sm uppercase font-bold text-center text-lg tracking-widest"></div>
+                    <div><label class="block text-xs font-semibold mb-1">이름</label><input type="text" id="staffName" required class="w-full border rounded-2xl p-3.5 text-sm"></div>
+                    <div><label class="block text-xs font-semibold mb-1">생년월일 8자리 (계정 찾기용)</label><input type="text" id="staffBirth" required maxlength="8" inputmode="numeric" oninput="autoFormatBirth(this)" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="숫자만 8자리 (예: 20020505)"></div>
+                    <div><label class="block text-xs font-semibold mb-1">전화번호 (계정 찾기용)</label><input type="tel" id="staffPhone" required inputmode="numeric" oninput="autoFormatPhone(this)" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="010-0000-0000"></div>
+                    <div><label class="block text-xs font-semibold mb-1">사용할 아이디</label><input type="text" id="staffEmail" required class="w-full border rounded-2xl p-3.5 text-sm"></div>
+                    <div><label class="block text-xs font-semibold mb-1">비밀번호</label><input type="password" id="staffPw" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm"></div>
+                    <div class="pt-2 flex gap-2">
+                        <button type="button" onclick="closeStaffSignupModal()" class="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
+                        <button type="submit" class="flex-1 py-4 bg-emerald-600 text-white font-bold rounded-2xl text-sm shadow">가입 완료</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 판매 정산 모달 -->
+        <div id="batchSaleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4 border border-slate-100">
+                <h3 class="font-extrabold text-lg text-slate-900" id="batchModalTitle">상품 판매 정산</h3>
+                <p class="text-xs text-slate-500" id="batchModalStockInfo">현재고: 0개</p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">정산 기준 날짜 (과거 보정 시 수정)</label>
+                    <input type="date" id="batchSaleDate" class="w-full border rounded-xl p-3 text-sm focus:outline-none">
                 </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- 알바생 회원가입 모달 -->
-    <div id="staffSignupModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
-            <div class="bg-emerald-600 p-6 flex justify-between items-center text-white shrink-0">
-                <h3 class="font-extrabold text-base"><i class="fa-solid fa-user-clock mr-2"></i>알바생 무료 회원가입</h3>
-                <button onclick="closeStaffSignupModal()" class="text-emerald-200 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            <form onsubmit="handleStaffSignup(event)" class="p-6 space-y-4 overflow-y-auto no-scrollbar">
-                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-xs text-emerald-800">💡 사장님께 받은 <b>매장 고유 4자리 코드</b>를 정확히 입력하세요.</div>
-                <div><label class="block text-xs font-semibold mb-1">매장 4자리 코드</label><input type="text" id="staffStoreCode" required class="w-full border rounded-2xl p-3.5 text-sm uppercase font-bold text-center text-lg tracking-widest"></div>
-                <div><label class="block text-xs font-semibold mb-1">이름</label><input type="text" id="staffName" required class="w-full border rounded-2xl p-3.5 text-sm"></div>
-                <div><label class="block text-xs font-semibold mb-1">생년월일 8자리 (계정 찾기용)</label><input type="text" id="staffBirth" required maxlength="8" class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="예: 20020505"></div>
-                <div><label class="block text-xs font-semibold mb-1">전화번호 (계정 찾기용)</label><input type="tel" id="staffPhone" required class="w-full border rounded-2xl p-3.5 text-sm bg-slate-50/30" placeholder="010-0000-0000"></div>
-                <div><label class="block text-xs font-semibold mb-1">사용할 아이디</label><input type="text" id="staffEmail" required class="w-full border rounded-2xl p-3.5 text-sm"></div>
-                <div><label class="block text-xs font-semibold mb-1">비밀번호</label><input type="password" id="staffPw" required minlength="8" class="w-full border rounded-2xl p-3.5 text-sm"></div>
-                <div class="pt-2 flex gap-2">
-                    <button type="button" onclick="closeStaffSignupModal()" class="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
-                    <button type="submit" class="flex-1 py-4 bg-emerald-600 text-white font-bold rounded-2xl text-sm shadow">가입 완료</button>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">판매 수량 입력</label>
+                    <input type="text" id="batchSaleInput" oninput="formatCurrencyInput(this)" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="팔린 수량 입력">
                 </div>
-            </form>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="closeBatchSaleModal()" class="flex-1 py-3.5 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
+                    <button onclick="confirmBatchSale()" class="flex-1 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl text-sm shadow">정산 반영</button>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <!-- ★ 판매 정산 (과거 보정 모달) -->
-    <div id="batchSaleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4 border border-slate-100">
-            <h3 class="font-extrabold text-lg text-slate-900" id="batchModalTitle">상품 판매 정산</h3>
-            <p class="text-xs text-slate-500" id="batchModalStockInfo">현재고: 0개</p>
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">정산 기준 날짜 (과거 보정 시 수정)</label>
-                <input type="date" id="batchSaleDate" class="w-full border rounded-xl p-3 text-sm focus:outline-none">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">판매 수량 입력</label>
-                <input type="text" id="batchSaleInput" oninput="formatCurrencyInput(this)" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="팔린 수량 입력">
-            </div>
-            <div class="flex gap-2 pt-2">
-                <button onclick="closeBatchSaleModal()" class="flex-1 py-3.5 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
-                <button onclick="confirmBatchSale()" class="flex-1 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl text-sm shadow">정산 반영</button>
+        <!-- 사장님 달력 스케줄 모달 -->
+        <div id="ownerCalendarModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-calendar-plus text-indigo-600 mr-2"></i>직원 스케줄 달력</h3>
+                    <button onclick="closeOwnerCalendarModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div class="text-xs text-slate-500 mb-2">날짜 칸을 클릭하여 해당 요일의 근무 시간을 직접 적으세요.</div>
+                <div id="ownerCalendarContainer" class="bg-white p-2 rounded-2xl border shadow-sm"></div>
+                <button onclick="closeOwnerCalendarModal()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-2xl text-sm mt-2">완료 및 닫기</button>
             </div>
         </div>
-    </div>
 
-    <!-- ★ 사장님 달력 스케줄 팝업 모달 (유일한 정의) -->
-    <div id="ownerCalendarModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
-            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-                <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-calendar-plus text-indigo-600 mr-2"></i>직원 스케줄 달력</h3>
-                <button onclick="closeOwnerCalendarModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+        <!-- 관리자 지점 장부 모달 -->
+        <div id="storeInventoryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex flex-col justify-end z-50">
+            <div class="bg-white w-full rounded-t-3xl h-[85vh] flex flex-col border-t border-slate-100">
+                <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl shrink-0">
+                    <div><h3 class="font-extrabold text-lg text-slate-900" id="modalStoreName">가게 이름</h3><p class="text-xs text-slate-500" id="modalStoreInfo">대표자 / 업종</p></div>
+                    <button onclick="closeStoreInventory()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-2xl"></i></button>
+                </div>
+                <div class="grid grid-cols-3 gap-2 p-4 bg-slate-100/70 border-b border-slate-100 text-center text-xs shrink-0">
+                    <div><span class="text-slate-500 block mb-0.5">총매출</span><b class="text-slate-900 text-sm" id="modalRevenue">₩ 0</b></div>
+                    <div><span class="text-slate-500 block mb-0.5">발주비용</span><b class="text-orange-600 text-sm" id="modalCost">₩ 0</b></div>
+                    <div><span class="text-emerald-700 block mb-0.5 font-bold">순수익</span><b class="text-emerald-700 text-sm" id="modalProfit">₩ 0</b></div>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 space-y-2.5 no-scrollbar" id="modalInventoryList"></div>
+                <div class="p-4 bg-white border-t border-slate-100 shrink-0">
+                    <button onclick="exportAdminToCSV()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl text-sm shadow transition">
+                        <i class="fa-solid fa-file-excel mr-1"></i> 📊 해당 지점 전체 장부 엑셀(CSV) 다운로드
+                    </button>
+                </div>
             </div>
-            <div class="text-xs text-slate-500 mb-2">날짜 칸을 클릭하여 해당 요일의 근무 시간을 직접 적으세요.</div>
-            <!-- 달력이 그려질 컨테이너 -->
-            <div id="ownerCalendarContainer" class="bg-white p-2 rounded-2xl border shadow-sm"></div>
-            <button onclick="closeOwnerCalendarModal()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-2xl text-sm mt-2">완료 및 닫기</button>
         </div>
-    </div>
 
-    <!-- 관리자 지점 장부 모달 -->
-    <div id="storeInventoryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex flex-col justify-end z-50">
-        <div class="bg-white w-full rounded-t-3xl h-[85vh] flex flex-col border-t border-slate-100">
-            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl shrink-0">
-                <div><h3 class="font-extrabold text-lg text-slate-900" id="modalStoreName">가게 이름</h3><p class="text-xs text-slate-500" id="modalStoreInfo">대표자 / 업종</p></div>
-                <button onclick="closeStoreInventory()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-2xl"></i></button>
-            </div>
-            <div class="grid grid-cols-3 gap-2 p-4 bg-slate-100/70 border-b border-slate-100 text-center text-xs shrink-0">
-                <div><span class="text-slate-500 block mb-0.5">총매출</span><b class="text-slate-900 text-sm" id="modalRevenue">₩ 0</b></div>
-                <div><span class="text-slate-500 block mb-0.5">발주비용</span><b class="text-orange-600 text-sm" id="modalCost">₩ 0</b></div>
-                <div><span class="text-emerald-700 block mb-0.5 font-bold">순수익</span><b class="text-emerald-700 text-sm" id="modalProfit">₩ 0</b></div>
-            </div>
-            <div class="flex-1 overflow-y-auto p-4 space-y-2.5 no-scrollbar" id="modalInventoryList"></div>
-            <div class="p-4 bg-white border-t border-slate-100 shrink-0">
-                <button onclick="exportAdminToCSV()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl text-sm shadow transition">
-                    <i class="fa-solid fa-file-excel mr-1"></i> 📊 해당 지점 전체 장부 엑셀(CSV) 다운로드
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 구독 모달 -->
-    <div id="subscriptionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
-            <div class="flex justify-between items-center border-b border-slate-100 pb-4">
-                <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-star text-amber-500 mr-2"></i>PRO 멤버십 (월 3만 원)</h3>
-                <button onclick="closeSubscriptionModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            <div class="space-y-3 text-xs text-slate-600 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
-                <p>✔ 알바생 5명 이상 무제한 인원 확장 관리</p>
-                <p>✔ 달력 기반 연장/야간/특근 수당 자동 계산</p>
-                <p>✔ 세무 신고용 완벽 엑셀(CSV) 원클릭 다운로드</p>
-            </div>
-            <div class="pt-2 space-y-2">
-                <button onclick="payMonthlySubscription()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-4 rounded-2xl text-sm shadow-xl transition">💳 매월 30,000원 결제</button>
-                <button onclick="closeSubscriptionModal()" class="w-full bg-slate-100 font-bold py-3 rounded-2xl text-xs">닫기</button>
+        <!-- 구독 모달 -->
+        <div id="subscriptionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4 border border-slate-100">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                    <h3 class="font-extrabold text-lg text-slate-900"><i class="fa-solid fa-star text-amber-500 mr-2"></i>PRO 멤버십 (월 3만 원)</h3>
+                    <button onclick="closeSubscriptionModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div class="space-y-3 text-xs text-slate-600 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                    <p>✔ 알바생 5명 이상 무제한 인원 확장 관리</p>
+                    <p>✔ 달력 기반 연장/야간/특근 수당 자동 계산</p>
+                    <p>✔ 세무 신고용 완벽 엑셀(CSV) 원클릭 다운로드</p>
+                </div>
+                <div class="pt-2 space-y-2">
+                    <button onclick="payMonthlySubscription()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-4 rounded-2xl text-sm shadow-xl transition">💳 매월 30,000원 결제</button>
+                    <button onclick="closeSubscriptionModal()" class="w-full bg-slate-100 font-bold py-3 rounded-2xl text-xs">닫기</button>
+                </div>
             </div>
         </div>
-    </div>
+    </div> <!-- 모달 컨테이너 종료 -->
 
     <!-- 메인 앱 화면 -->
     <div id="appScreen" class="hidden flex flex-col h-screen overflow-hidden relative bg-slate-100">
@@ -255,8 +255,8 @@
                     </div>
                     <ul class="text-xs text-amber-800 space-y-1.5 mb-3 font-medium">
                         <li><i class="fa-solid fa-check text-amber-600 mr-1"></i> 알바생 무제한 등록 & 캘린더 스케줄 관리</li>
-                        <li><i class="fa-solid fa-check text-amber-600 mr-1"></i> 연장/야간/휴일 특근 수당 완벽 자동 계산</li>
-                        <li><i class="fa-solid fa-check text-amber-600 mr-1"></i> AI 도매처 실시간 최저가 비교 (월 수십만 원 절감)</li>
+                        <li><i class="fa-solid fa-check text-amber-600 mr-1"></i> 연장/야간/휴일 수당 및 세금 자동 계산</li>
+                        <li><i class="fa-solid fa-check text-amber-600 mr-1"></i> 세무 신고용 완벽 엑셀(CSV) 원클릭 다운로드</li>
                     </ul>
                     <button onclick="openSubscriptionModal()" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold py-3.5 rounded-xl shadow-md transition text-sm">
                         월 30,000원으로 업그레이드
@@ -290,7 +290,6 @@
                     <div class="bg-white p-3 rounded-2xl border text-center"><span class="text-[10px] text-slate-400 block mb-1">폐기 손실</span><h4 class="text-xs font-extrabold text-rose-600" id="totalWasteExpense">₩ 0</h4></div>
                 </div>
 
-                <!-- 🔥 매장 BEST 판매 품목 -->
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/60">
                     <div class="flex justify-between items-center mb-3">
                         <h4 class="font-bold text-sm text-slate-900"><i class="fa-solid fa-crown text-amber-500 mr-1.5"></i>🔥 매장 BEST 판매 품목</h4>
@@ -310,7 +309,7 @@
                         <div class="flex justify-between"><span class="text-slate-500">시급:</span> <b class="text-slate-900" id="staffPanelWage">₩ 0</b></div>
                         <div class="flex justify-between"><span class="text-slate-500">승인된 시간:</span> <b class="text-indigo-600" id="staffPanelTotalHours">0시간 0분</b></div>
                         <div class="flex justify-between"><span class="text-slate-500">세전 총액:</span> <b class="text-slate-700" id="staffPanelBasePay">₩ 0</b></div>
-                        <div class="flex justify-between"><span class="text-slate-500" id="staffPanelTaxLabel">세금/공제액 (미적용):</span> <b class="text-rose-500" id="staffPanelTax">- ₩ 0</b></div>
+                        <div class="flex justify-between"><span class="text-slate-500" id="staffPanelTaxLabel">세금/공제액:</span> <b class="text-rose-500" id="staffPanelTax">- ₩ 0</b></div>
                         <div class="border-t border-slate-200 pt-2 flex justify-between text-sm font-extrabold text-slate-900">
                             <span>실수령액 (예상):</span> <span class="text-indigo-600" id="staffPanelEstimatedPay">₩ 0</span>
                         </div>
@@ -380,6 +379,8 @@
                         <button onclick="registerCustomProduct()" class="w-full bg-amber-600 text-white font-bold py-2.5 rounded-xl shadow mt-2">등록하기</button>
                     </div>
 
+                    <div id="actionForm" class="hidden space-y-3"></div>
+
                     <div id="myInventoryList" class="space-y-3 mt-6 border-t pt-4"></div>
                 </div>
             </div>
@@ -396,12 +397,10 @@
                         <h3 class="font-bold text-base text-slate-900"><i class="fa-solid fa-calendar-check mr-1.5 text-emerald-600"></i>일자별 상세 판매 내역</h3>
                         <input type="date" id="statsDatePicker" onchange="renderDailyDetailedStats()" class="border border-slate-200 rounded-lg p-1.5 text-[11px] font-bold focus:outline-none focus:border-emerald-500">
                     </div>
-                    
                     <div id="dailyTotalSummary" class="bg-emerald-50 p-3 rounded-xl mb-3 flex justify-between items-center border border-emerald-100 shadow-inner">
                         <span class="font-bold text-emerald-900 text-xs">총 0개 판매</span>
                         <span class="font-extrabold text-indigo-700 text-sm">매출 ₩0</span>
                     </div>
-
                     <div id="dailyDetailedStatsList" class="space-y-2 text-xs"></div>
                 </div>
 
@@ -446,7 +445,6 @@
                     </div>
                     <button onclick="openStoreInventory('seolyh0328')" class="bg-indigo-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">가게 관리</button>
                 </div>
-
                 <div id="adminUserList" class="space-y-4"></div>
             </div>
         </main>
@@ -462,32 +460,45 @@
 
     <!-- 로직 스크립트 -->
     <script>
-        // AI 10만+ 도매 매칭 시뮬레이션
-        function getAIRecommendations(q) {
-            const brands = {
-                "빵": ["삼립 정통 크림빵", "샤니 꿀호떡", "파리바게뜨 토스트식빵", "뚜레쥬르 옥수수식빵", "냉동 크로와상 생지(50입)", "업소용 햄버거번(30입)"],
-                "우유": ["서울우유 1L", "매일우유 900ml", "남양 맛있는우유GT", "연세우유 멸균우유 1박스", "파스퇴르 우유"],
-                "커피": ["스타벅스 로스트 원두 1kg", "맥심 모카골드(200T)", "카누 미니(100T)", "이디야 블렌드 원두 1kg", "콜롬비아 수프리모 1kg"],
-                "고기": ["한돈 삼겹살(냉장 1kg)", "수입산 대패삼겹살(3kg)", "한우 1++ 등심(500g)", "미국산 프라임 척아이롤(2kg)"],
-                "치즈": ["서울우유 체다치즈(100매)", "매일유업 모짜렐라(1kg)", "필라델피아 크림치즈", "업소용 눈꽃치즈(2kg)"],
-                "맥주": ["카스(병 500ml)", "테라(병 500ml)", "켈리(병 500ml)", "아사히 수퍼드라이", "하이네켄 케그(5L)"],
-                "소주": ["참이슬 후레쉬", "참이슬 오리지널", "진로 이즈백", "처음처럼", "새로"],
-                "라면": ["신라면(30봉 1박스)", "진라면 매운맛(30봉)", "짜파게티(30봉)", "불닭볶음면(30봉)"]
-            };
-            
-            let results = [];
-            for (let key in brands) {
-                if (q.includes(key) || key.includes(q)) {
-                    brands[key].forEach(name => {
-                        results.push({ name: name, category: "AI도매매칭", defaultCost: Math.floor(Math.random()*5000+1000), defaultPrice: Math.floor(Math.random()*8000+2000) });
-                    });
-                }
-            }
-            if (results.length === 0) {
-                results.push({ name: `[업소용 대용량] ${q}`, category: "AI도매매칭", defaultCost: 15000, defaultPrice: 25000 });
-                results.push({ name: `가성비 ${q} (B2B 전용)`, category: "AI도매매칭", defaultCost: 5000, defaultPrice: 10000 });
-            }
-            return results;
+        // ★ Firebase 연동 스크립트 시작 ★
+        const firebaseConfig = {
+            apiKey: "AIzaSyAW2EuZIoGvsbfReNcY6loLpFvbawK0FSU",
+            authDomain: "easy-smart-stock-fe6e2.firebaseapp.com",
+            projectId: "easy-smart-stock-fe6e2",
+            storageBucket: "easy-smart-stock-fe6e2.firebasestorage.app",
+            messagingSenderId: "436413309267",
+            appId: "1:436413309267:web:658e4bdaf6ad7772bb81a6"
+        };
+        
+        // 파이어베이스 초기화
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // 앱의 모든 정보를 담을 중앙 데이터 허브
+        let globalData = {
+            users: {}, inventory: {}, sales: {}, staffs: {}, schedules: {}, subs: {}
+        };
+        let isFirebaseInitialized = false;
+
+        // Firebase에 데이터를 쓰고 동시에 글로벌 데이터에도 반영하는 핵심 함수
+        function saveToDB(collectionKey, dataObj) {
+            globalData[collectionKey] = dataObj; // 로컬 화면 즉시 반영 (빠른 속도)
+            db.collection("easy_smart_stock").doc(collectionKey).set(dataObj).catch(e => console.error("DB 저장 에러:", e));
+        }
+
+        // ==========================================
+        // 철통 보안 입력 폼 자동 변환 함수
+        // ==========================================
+        function autoFormatPhone(obj) {
+            let val = obj.value.replace(/[^0-9]/g, ''); 
+            if (val.length > 0 && !val.startsWith('010')) { val = '010' + val; }
+            if (val.length < 4) { obj.value = val; } 
+            else if (val.length < 8) { obj.value = val.slice(0, 3) + '-' + val.slice(3); } 
+            else { obj.value = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11); }
+        }
+
+        function autoFormatBirth(obj) {
+            obj.value = obj.value.replace(/[^0-9]/g, '').slice(0, 8);
         }
 
         function getLocalIsoDate() {
@@ -497,8 +508,7 @@
 
         function formatHM(minutes) {
             if (!minutes || minutes <= 0) return "0분";
-            const h = Math.floor(minutes / 60);
-            const m = minutes % 60;
+            const h = Math.floor(minutes / 60); const m = minutes % 60;
             if (h > 0 && m > 0) return `${h}시간 ${m}분`;
             if (h > 0) return `${h}시간`;
             return `${m}분`;
@@ -509,25 +519,62 @@
             input.value = val ? Number(val).toLocaleString() : '';
         }
 
+        let selectedRole = "owner";
+        let currentLoggedInEmail = null;
+        let batchTargetItemId = null;
+        let isIdChecked = false;
+        let currentCalendarTargetStaff = null;
+        let currentAdminModalUserId = null;
+        let calYear = new Date().getFullYear();
+        let calMonth = new Date().getMonth();
+
         // ==========================================
-        // ★ 세션 유지 방어 로직
+        // ★ 앱 시작 시 Firebase 동기화 로직
         // ==========================================
+        document.addEventListener("DOMContentLoaded", () => {
+            // Firebase의 easy_smart_stock 컬렉션을 실시간 감시 (사장님 ↔ 알바생 0.1초 동기화)
+            db.collection("easy_smart_stock").onSnapshot((snapshot) => {
+                if (snapshot.empty) {
+                    // 앱 최초 실행 시 빈 방(컬렉션) 만들어주기
+                    saveToDB('users', {"seolyh0328": { role: "admin", password: "yongho0229!", name: "총괄 본사", storeCode: "ADMIN" }});
+                    saveToDB('inventory', {}); saveToDB('sales', {}); saveToDB('staffs', {}); saveToDB('schedules', {}); saveToDB('subs', {});
+                } else {
+                    snapshot.forEach(doc => { globalData[doc.id] = doc.data(); });
+                }
+
+                // 앱 최초 로딩 끝났을 때
+                if (!isFirebaseInitialized) {
+                    isFirebaseInitialized = true;
+                    document.getElementById('firebaseLoading').classList.add('hidden');
+                    initSystem(); // 자동 로그인 체크 등 실행
+                } else {
+                    // 누군가 데이터를 바꿔서 실시간으로 신호가 날아왔을 때 화면 갱신
+                    if (currentLoggedInEmail) {
+                        if (selectedRole === 'owner') {
+                            refreshDashboard();
+                            renderOwnerStaffList();
+                            // 만약 사장님이 특정 알바 달력 보고 있으면 그 달력도 실시간 갱신
+                            if(currentCalendarTargetStaff && !document.getElementById("ownerCalendarModal").classList.contains("hidden")) {
+                                renderCalendar('ownerCalendarContainer', currentCalendarTargetStaff, 'owner');
+                            }
+                        } else if (selectedRole === 'staff') {
+                            const staffData = globalData.staffs[currentLoggedInEmail];
+                            if (staffData) updateStaffUI(staffData); // 화면만 새로고침 (탭 이동 X)
+                        } else if (selectedRole === 'admin') {
+                            renderAdminDashboard();
+                        }
+                    }
+                }
+            });
+        });
+
         function initSystem() {
-            if (!localStorage.getItem("smart_stock_users_v58")) {
-                localStorage.setItem("smart_stock_users_v58", JSON.stringify({"seolyh0328": { role: "admin", password: "yongho0229!", name: "총괄 본사", storeCode: "ADMIN" }}));
-                localStorage.setItem("smart_stock_inventory_v58", JSON.stringify({}));
-                localStorage.setItem("smart_stock_sales_v58", JSON.stringify({}));
-                localStorage.setItem("smart_stock_staffs_v58", JSON.stringify({}));
-                localStorage.setItem("smart_stock_schedules_v58", JSON.stringify({}));
-                localStorage.setItem("smart_stock_subs_v58", JSON.stringify({}));
-            }
-            
-            const autoLogin = localStorage.getItem("smart_stock_autologin_v58");
+            const autoLogin = localStorage.getItem("smart_stock_autologin_v61");
             if (autoLogin) {
                 try {
                     const sd = JSON.parse(autoLogin);
-                    const users = JSON.parse(localStorage.getItem("smart_stock_users_v58"));
-                    const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+                    const users = globalData.users;
+                    const staffs = globalData.staffs;
                     
                     if (sd.role === 'staff' && staffs && staffs[sd.email] && staffs[sd.email].password === sd.pw) {
                         currentLoggedInEmail = sd.email; selectedRole = 'staff'; 
@@ -541,7 +588,7 @@
                         return;
                     }
                 } catch(e) { 
-                    localStorage.removeItem("smart_stock_autologin_v58"); 
+                    localStorage.removeItem("smart_stock_autologin_v61"); 
                 }
             }
             
@@ -553,18 +600,9 @@
             }
         }
 
-        let selectedRole = "owner";
-        let currentLoggedInEmail = null;
-        let batchTargetItemId = null;
-        let isIdChecked = false;
-        let currentCalendarTargetStaff = null;
-        let currentAdminModalUserId = null;
-        
-        let calYear = new Date().getFullYear();
-        let calMonth = new Date().getMonth();
-
-        document.addEventListener("DOMContentLoaded", initSystem);
-
+        // ==========================================
+        // UI & 로그인 처리 함수들
+        // ==========================================
         function switchTab(tabName) {
             document.getElementById("tabContentDashboard").classList.add("hidden");
             document.getElementById("tabContentStaffPanel")?.classList.add("hidden");
@@ -617,17 +655,19 @@
             const phone = document.getElementById("findPhone").value.trim();
             const birth = document.getElementById("findBirth").value.trim();
             
+            if(birth.length !== 8) return alert("생년월일 8자리를 정확히 입력하세요. (예: 19900101)");
+
             let foundEmail = null; let foundPw = null;
 
             if (role === 'owner') {
-                const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+                const users = globalData.users || {};
                 for(let k in users) {
                     if(users[k].name === name && users[k].phone === phone && users[k].birth === birth) {
                         foundEmail = k; foundPw = users[k].password; break;
                     }
                 }
             } else {
-                const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
+                const staffs = globalData.staffs || {};
                 for(let k in staffs) {
                     if(staffs[k].name === name && staffs[k].phone === phone && staffs[k].birth === birth) {
                         foundEmail = k; foundPw = staffs[k].password; break;
@@ -649,8 +689,8 @@
             const email = document.getElementById("signupEmail").value.trim();
             const msg = document.getElementById("idCheckMsg");
             if (!email) return alert("아이디를 입력하세요");
-            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
+            const users = globalData.users || {};
+            const staffs = globalData.staffs || {};
             if (users[email] || staffs[email]) { isIdChecked = false; msg.className = "text-[11px] mt-1 block font-bold text-rose-600"; msg.innerText = "❌ 중복 아이디"; }
             else { isIdChecked = true; msg.className = "text-[11px] mt-1 block font-bold text-emerald-600"; msg.innerText = "✅ 사용 가능"; }
         }
@@ -662,21 +702,26 @@
             const pw = document.getElementById("signupPw").value;
             if (pw !== document.getElementById("signupPwConfirm").value) return alert("비밀번호 불일치");
             
-            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+            const birth = document.getElementById("signupBirth").value.trim();
+            if(birth.length !== 8) return alert("생년월일은 숫자 8자리로 정확히 입력해주세요. (예: 19801225)");
+            
+            const phone = document.getElementById("signupPhone").value.trim();
+            if(phone.length !== 13) return alert("전화번호를 끝까지 정확히 입력해주세요.");
+
+            let users = globalData.users || {};
             let storeCode = ""; const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             for (let i = 0; i < 4; i++) storeCode += chars.charAt(Math.floor(Math.random() * chars.length));
 
             users[email] = { 
                 role: "owner", password: pw, name: document.getElementById("signupName").value, storeCode,
                 ownerName: document.getElementById("signupOwnerName").value,
-                phone: document.getElementById("signupPhone").value,
-                birth: document.getElementById("signupBirth").value,
+                phone: phone, birth: birth,
                 businessType: document.getElementById("signupBusinessType").value
             };
-            localStorage.setItem("smart_stock_users_v58", JSON.stringify(users));
+            saveToDB('users', users);
 
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58")) || {}; inv[email] = {}; localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {}; sales[email] = { revenue: 0, orderExpense: 0, wasteExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} }; localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
+            let inv = globalData.inventory || {}; inv[email] = {}; saveToDB('inventory', inv);
+            let sales = globalData.sales || {}; sales[email] = { revenue: 0, orderExpense: 0, wasteExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} }; saveToDB('sales', sales);
 
             alert(`가입 완료! 매장 코드: [${storeCode}]`);
             closeSignupModal();
@@ -686,23 +731,30 @@
             e.preventDefault();
             const storeCode = document.getElementById("staffStoreCode").value.trim().toUpperCase();
             const email = document.getElementById("staffEmail").value.trim();
-            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58"));
+            const users = globalData.users || {};
+            
+            const birth = document.getElementById("staffBirth").value.trim();
+            if(birth.length !== 8) return alert("생년월일은 숫자 8자리로 정확히 입력해주세요. (예: 20020505)");
+            
+            const phone = document.getElementById("staffPhone").value.trim();
+            if(phone.length !== 13) return alert("전화번호를 끝까지 정확히 입력해주세요.");
+
             let ownerEmail = null;
             for (let k in users) { if (users[k].storeCode === storeCode) ownerEmail = k; }
             if (!ownerEmail) return alert("❌ 존재하지 않는 매장 코드입니다!");
 
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
-            const subs = JSON.parse(localStorage.getItem("smart_stock_subs_v58")) || {};
+            let staffs = globalData.staffs || {};
+            let subs = globalData.subs || {};
             let count = Object.values(staffs).filter(s => s.ownerEmail === ownerEmail).length;
             if (count >= 4 && !subs[ownerEmail]?.active) return alert("무료 인원(4명) 초과! 사장님께 PRO 구독 요청.");
             if (staffs[email]) return alert("이미 등록된 아이디입니다.");
 
             staffs[email] = { 
                 role: "staff", password: document.getElementById("staffPw").value, name: document.getElementById("staffName").value, 
-                phone: document.getElementById("staffPhone").value, birth: document.getElementById("staffBirth").value,
+                phone: phone, birth: birth,
                 wage: 10030, ownerEmail, storeName: users[ownerEmail].name, working: false, pendingMinutes: 0, approvedMinutes: 0, taxType: 'none'
             };
-            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+            saveToDB('staffs', staffs);
             alert("알바생 가입 완료!"); closeStaffSignupModal();
         }
 
@@ -713,17 +765,17 @@
             const remember = document.getElementById("rememberMe").checked;
 
             if (selectedRole === 'staff') {
-                const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
+                const staffs = globalData.staffs || {};
                 if (staffs[email] && staffs[email].password === pw) {
                     currentLoggedInEmail = email;
-                    if (remember) localStorage.setItem("smart_stock_autologin_v58", JSON.stringify({ email, pw, role: 'staff' }));
+                    if (remember) localStorage.setItem("smart_stock_autologin_v61", JSON.stringify({ email, pw, role: 'staff' }));
                     enterStaffApp(staffs[email]);
                 } else alert("로그인 실패");
             } else {
-                const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+                const users = globalData.users || {};
                 if (users[email] && users[email].role === selectedRole && users[email].password === pw) {
                     currentLoggedInEmail = email;
-                    if (remember) localStorage.setItem("smart_stock_autologin_v58", JSON.stringify({ email, pw, role: selectedRole }));
+                    if (remember) localStorage.setItem("smart_stock_autologin_v61", JSON.stringify({ email, pw, role: selectedRole }));
                     enterApp(users[email]);
                 } else alert("로그인 실패");
             }
@@ -743,11 +795,6 @@
             } else if (user.role === "admin") {
                 document.getElementById("headerTitle").innerText = "관제탑 (본사 만능)";
                 document.getElementById("mobileBottomNav").classList.add("hidden");
-                document.getElementById("tabContentDashboard").classList.add("hidden");
-                document.getElementById("tabContentStaffPanel").classList.add("hidden");
-                document.getElementById("tabContentStaffManage").classList.add("hidden");
-                document.getElementById("tabContentStock").classList.add("hidden");
-                document.getElementById("tabContentStats").classList.add("hidden");
                 document.getElementById("adminSection").classList.remove("hidden");
                 renderAdminDashboard();
             }
@@ -756,16 +803,12 @@
             }
         }
 
-        function enterStaffApp(staff) {
-            document.getElementById("loginScreen").classList.add("hidden");
-            document.getElementById("appScreen").classList.remove("hidden");
-            document.getElementById("mobileBottomNav").classList.add("hidden");
-            
+        // 실시간 업데이트 시 화면만 새로고침하는 알바생 함수
+        function updateStaffUI(staff) {
             document.getElementById("headerTitle").innerText = `${staff.storeName} 알바 포털`;
             document.getElementById("staffPanelName").innerText = `${staff.name}님 환영합니다!`;
             document.getElementById("staffPanelStore").innerText = `근무지: ${staff.storeName}`;
             document.getElementById("staffPanelWage").innerText = `₩ ${staff.wage.toLocaleString()}`;
-            
             document.getElementById("staffPanelTotalHours").innerText = formatHM(staff.approvedMinutes || 0);
             
             const hoursWorked = (staff.approvedMinutes || 0) / 60;
@@ -788,20 +831,23 @@
                 document.getElementById("pendingWorkBox").classList.add("hidden");
             }
             
-            calYear = new Date().getFullYear(); calMonth = new Date().getMonth();
             renderCalendar('staffGridCalendar', currentLoggedInEmail, 'staff');
             updateStaffWorkButtonState(staff);
+        }
+
+        // 최초 진입 시 호출
+        function enterStaffApp(staff) {
+            document.getElementById("loginScreen").classList.add("hidden");
+            document.getElementById("appScreen").classList.remove("hidden");
+            document.getElementById("mobileBottomNav").classList.add("hidden");
+            calYear = new Date().getFullYear(); calMonth = new Date().getMonth();
+            
+            updateStaffUI(staff);
             switchTab('dashboard');
         }
 
-        function logout() {
-            localStorage.removeItem("smart_stock_autologin_v58");
-            currentLoggedInEmail = null;
-            location.reload();
-        }
-
         // ==========================================
-        // ★ 달력 렌더링 코어 로직
+        // ★ 달력 및 스케줄러 로직
         // ==========================================
         function changeCalMonth(offset, containerId, targetEmail, role) {
             calMonth += offset;
@@ -818,8 +864,8 @@
             const yyyy = String(calYear); const mm = String(calMonth + 1).padStart(2, '0');
             const todayStr = getLocalIsoDate();
 
-            const sch = JSON.parse(localStorage.getItem("smart_stock_schedules_v58")) || {};
-            const mySch = sch[targetEmail] || {};
+            const schMap = globalData.schedules || {};
+            const mySch = schMap[targetEmail] || {};
 
             let html = `
                 <div class="flex justify-between items-center mb-3 px-2">
@@ -842,12 +888,69 @@
             container.innerHTML = html;
         }
 
+        function toggleStaffWork() {
+            let staffs = globalData.staffs || {};
+            let staff = staffs[currentLoggedInEmail];
+            const todayStr = getLocalIsoDate();
+            const schMap = globalData.schedules || {};
+            const sch = schMap[currentLoggedInEmail] || {};
+
+            if (!staff.working) {
+                if (!sch[todayStr]) return alert("❌ 오늘은 캘린더에 스케줄이 없습니다! 휴무일엔 출근 불가.");
+                staff.working = true; staff.startTime = Date.now();
+                alert("출근 타이머 시작!");
+            } else {
+                const mins = Math.floor((Date.now() - staff.startTime) / (1000 * 60));
+                staff.pendingMinutes = (staff.pendingMinutes || 0) + mins;
+                staff.working = false; staff.startTime = null;
+                alert(`퇴근 완료! ${formatHM(mins)} 사장님 승인 대기열 전송.`);
+            }
+            saveToDB('staffs', staffs); // 클라우드 동기화!
+        }
+
+        function approveStaffWorkHours() {
+            let staffs = globalData.staffs || {};
+            let staff = staffs[currentLoggedInEmail];
+            staff.approvedMinutes = (staff.approvedMinutes || 0) + (staff.pendingMinutes || 0);
+            staff.pendingMinutes = 0;
+            saveToDB('staffs', staffs); // 클라우드 동기화!
+            alert("✅ 근무 시간이 최종 승인되었습니다!");
+        }
+
+        function updateStaffWorkButtonState(staff) {
+            const btn = document.getElementById("workToggleBtn");
+            if (staff.working) {
+                btn.className = "w-full bg-rose-600 text-white font-extrabold py-4 rounded-2xl shadow transition";
+                btn.innerHTML = `<i class="fa-solid fa-stop mr-2"></i> 퇴근하기`;
+            } else {
+                btn.className = "w-full bg-emerald-600 text-white font-extrabold py-4 rounded-2xl shadow transition";
+                btn.innerHTML = `<i class="fa-solid fa-play mr-2"></i> 출근하기 (실시간 타이머)`;
+            }
+        }
+
+        function openOwnerCalendarModal(email) {
+            currentCalendarTargetStaff = email;
+            calYear = new Date().getFullYear(); calMonth = new Date().getMonth();
+            document.getElementById("ownerCalendarModal").classList.remove("hidden");
+            renderCalendar('ownerCalendarContainer', email, 'owner');
+        }
+        function closeOwnerCalendarModal() { document.getElementById("ownerCalendarModal").classList.add("hidden"); }
+        
+        function ownerEditDateSchedule(email, dateStr, containerId) {
+            let schMap = globalData.schedules || {};
+            if (!schMap[email]) schMap[email] = {};
+            const input = prompt(`[${dateStr}] 근무 시간을 자유롭게 적으세요 (예: 09:00~18:00)\n※ 칸을 완전히 비우면 휴무(삭제) 처리됩니다.`, schMap[email][dateStr]||"");
+            if (input === null) return;
+            if (input.trim() === "") delete schMap[email][dateStr]; else schMap[email][dateStr] = input.trim();
+            saveToDB('schedules', schMap); // 클라우드 동기화!
+        }
+
         // ==========================================
-        // ★ 사장님 전용 알바생 관리 탭 (시급 & 스케줄 버튼 완벽 복원)
+        // ★ 사장님 전용 알바생 관리
         // ==========================================
         function renderOwnerStaffList() { 
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58")) || {};
-            const schedules = JSON.parse(localStorage.getItem("smart_stock_schedules_v58")) || {};
+            const staffs = globalData.staffs || {};
+            const schedules = globalData.schedules || {};
             const listContainer = document.getElementById("ownerStaffList");
             if (!listContainer) return; listContainer.innerHTML = "";
             
@@ -868,7 +971,6 @@
                                 <p class="text-indigo-700 mt-1 text-[10px] break-keep">📅 ${schSummary}</p>
                             </div>
                             <div class="flex flex-col gap-1.5 w-20 shrink-0">
-                                <!-- 시급설정 & 스케줄 버튼 복원 -->
                                 <button onclick="ownerEditStaffWage('${email}')" class="bg-blue-500 text-white font-bold py-1.5 rounded-lg text-[10px] shadow">💰 시급설정</button>
                                 <button onclick="openOwnerCalendarModal('${email}')" class="bg-indigo-600 text-white font-bold py-1.5 rounded-lg text-[10px] shadow">🗓️ 달력스케줄</button>
                                 <button onclick="ownerEditWorkTimeHM('${email}')" class="bg-amber-600 text-white font-bold py-1.5 rounded-lg text-[10px] shadow">⏱️ 시간보정</button>
@@ -893,99 +995,39 @@
         }
 
         function ownerEditStaffWage(email) {
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            let staffs = globalData.staffs || {};
             const newWage = parseInt(prompt(`[${staffs[email].name}] 알바생의 새로운 시급(원)을 입력하세요:`, staffs[email].wage), 10);
             if (isNaN(newWage) || newWage <= 0) return alert("올바른 시급을 입력하세요.");
             staffs[email].wage = newWage;
-            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
-            renderOwnerStaffList();
+            saveToDB('staffs', staffs);
             alert("✅ 시급이 성공적으로 변경되었습니다.");
         }
 
-        function openOwnerCalendarModal(email) {
-            currentCalendarTargetStaff = email;
-            calYear = new Date().getFullYear(); calMonth = new Date().getMonth();
-            document.getElementById("ownerCalendarModal").classList.remove("hidden");
-            renderCalendar('ownerCalendarContainer', email, 'owner');
-        }
-        function closeOwnerCalendarModal() { document.getElementById("ownerCalendarModal").classList.add("hidden"); }
-        
-        function ownerEditDateSchedule(email, dateStr, containerId) {
-            const sch = JSON.parse(localStorage.getItem("smart_stock_schedules_v58")) || {};
-            if (!sch[email]) sch[email] = {};
-            const input = prompt(`[${dateStr}] 근무 시간을 자유롭게 적으세요 (예: 09:00~18:00)\n※ 칸을 완전히 비우면 휴무(삭제) 처리됩니다.`, sch[email][dateStr]||"");
-            if (input === null) return;
-            if (input.trim() === "") delete sch[email][dateStr]; else sch[email][dateStr] = input.trim();
-            localStorage.setItem("smart_stock_schedules_v58", JSON.stringify(sch));
-            renderCalendar(containerId, email, 'owner'); renderOwnerStaffList();
-        }
-
         function ownerChangeTaxType(email, taxType) {
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            let staffs = globalData.staffs || {};
             staffs[email].taxType = taxType;
-            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
+            saveToDB('staffs', staffs);
         }
 
         function ownerEditWorkTimeHM(email) {
             const h = parseInt(prompt("인정해 줄 추가 근무 '시간' (예: 6):", "0"), 10);
             const m = parseInt(prompt("인정해 줄 추가 근무 '분' (예: 30):", "0"), 10);
             if (isNaN(h) || isNaN(m)) return;
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            let staffs = globalData.staffs || {};
             staffs[email].pendingMinutes = (staffs[email].pendingMinutes || 0) + (h*60 + m);
-            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
-            renderOwnerStaffList(); alert(`요청 완료!`);
+            saveToDB('staffs', staffs);
+            alert(`요청 완료!`);
         }
 
         function deleteStaff(email) {
             if (!confirm("알바생 명단을 삭제하시겠습니까?")) return;
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
-            delete staffs[email]; localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs)); renderOwnerStaffList();
-        }
-
-        function toggleStaffWork() {
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
-            const staff = staffs[currentLoggedInEmail];
-            const todayStr = getLocalIsoDate();
-            const sch = JSON.parse(localStorage.getItem("smart_stock_schedules_v58"))[currentLoggedInEmail] || {};
-
-            if (!staff.working) {
-                if (!sch[todayStr]) return alert("❌ 오늘은 캘린더에 스케줄이 없습니다! 휴무일엔 출근 불가.");
-                staff.working = true; staff.startTime = Date.now();
-                alert("출근 타이머 시작!");
-            } else {
-                const mins = Math.floor((Date.now() - staff.startTime) / (1000 * 60));
-                staff.pendingMinutes = (staff.pendingMinutes || 0) + mins;
-                staff.working = false; staff.startTime = null;
-                alert(`퇴근 완료! ${formatHM(mins)} 사장님 승인 대기열 전송.`);
-            }
-            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
-            enterStaffApp(staff);
-        }
-
-        function approveStaffWorkHours() {
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
-            const staff = staffs[currentLoggedInEmail];
-            staff.approvedMinutes = (staff.approvedMinutes || 0) + (staff.pendingMinutes || 0);
-            staff.pendingMinutes = 0;
-            staffs[currentLoggedInEmail] = staff;
-            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
-            enterStaffApp(staff);
-            alert("✅ 근무 시간이 최종 승인되었습니다!");
-        }
-
-        function updateStaffWorkButtonState(staff) {
-            const btn = document.getElementById("workToggleBtn");
-            if (staff.working) {
-                btn.className = "w-full bg-rose-600 text-white font-extrabold py-4 rounded-2xl shadow transition";
-                btn.innerHTML = `<i class="fa-solid fa-stop mr-2"></i> 퇴근하기`;
-            } else {
-                btn.className = "w-full bg-emerald-600 text-white font-extrabold py-4 rounded-2xl shadow transition";
-                btn.innerHTML = `<i class="fa-solid fa-play mr-2"></i> 출근하기 (실시간 타이머)`;
-            }
+            let staffs = globalData.staffs || {};
+            delete staffs[email]; 
+            saveToDB('staffs', staffs); 
         }
 
         // ==========================================
-        // ★ 직관적 검색 및 AI 10만+ 딥서치 연동 
+        // ★ 직관적 검색 및 AI 10만+ 도매처 매칭 
         // ==========================================
         function handleSearch() {
             const q = document.getElementById("searchInput").value.trim();
@@ -995,9 +1037,9 @@
             if (!q) { box.classList.add("hidden"); return; }
             const qLower = q.toLowerCase();
             
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"))[currentLoggedInEmail] || {};
+            const invMap = globalData.inventory || {};
+            const inv = invMap[currentLoggedInEmail] || {};
             let myItems = Object.keys(inv).map(id => ({id, ...inv[id]})).filter(i => i.name.toLowerCase().includes(qLower));
-            
             let master = getAIRecommendations(q).filter(i => !myItems.find(m => m.name === i.name));
             
             myItems.forEach(i => {
@@ -1046,70 +1088,67 @@
             const expiryDate = document.getElementById("newProductExpiryDate").value || getLocalIsoDate();
             
             const id = "CUST_" + Date.now();
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
-            if (!inv[currentLoggedInEmail]) inv[currentLoggedInEmail] = {};
+            let invMap = globalData.inventory || {};
+            if (!invMap[currentLoggedInEmail]) invMap[currentLoggedInEmail] = {};
 
-            inv[currentLoggedInEmail][id] = { 
+            invMap[currentLoggedInEmail][id] = { 
                 name, category: document.getElementById("newProductCategory").value, 
                 cost, price, stock: 0, 
                 expiryDays: 7, expiryDate: expiryDate, lastRestockDate: orderDate,
                 inputTime: Date.now(), totalSold: 0 
             };
-            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            saveToDB('inventory', invMap);
             
             alert("등록 완료! 아래 목록에서 수량을 조절하세요.");
             document.getElementById("newProductForm").classList.add("hidden"); 
             document.getElementById("searchInput").value = "";
-            refreshDashboard();
         }
 
         function updateItemDate(id, field, val) {
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
-            inv[currentLoggedInEmail][id][field] = val;
-            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            let invMap = globalData.inventory || {};
+            invMap[currentLoggedInEmail][id][field] = val;
+            saveToDB('inventory', invMap);
         }
 
         function directAdjustStock(itemId, action) {
             const amtStr = prompt(action === 'add' ? "간편 입고 수량:" : action === 'sub' ? "간편 출고/폐기 수량:" : "변경 재고량:");
             if(amtStr === null) return; const amt = parseInt(amtStr, 10); if(isNaN(amt) || amt < 0) return;
 
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"));
-            let item = inv[currentLoggedInEmail][itemId];
+            let invMap = globalData.inventory || {};
+            let salesMap = globalData.sales || {};
+            let item = invMap[currentLoggedInEmail][itemId];
 
             if(action === 'add') { 
                 item.stock += amt; 
                 item.lastRestockDate = getLocalIsoDate();
-                sales[currentLoggedInEmail].orderExpense += (item.cost * amt); 
+                salesMap[currentLoggedInEmail].orderExpense += (item.cost * amt); 
             }
             else if(action === 'sub') { if(item.stock < amt) return alert("재고 부족"); item.stock -= amt; }
             else { item.stock = amt; }
 
-            inv[currentLoggedInEmail][itemId] = item;
-            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
-            localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
-            refreshDashboard();
+            invMap[currentLoggedInEmail][itemId] = item;
+            saveToDB('inventory', invMap);
+            saveToDB('sales', salesMap);
         }
 
         function directSetStock(id, valStr) {
             const val = parseInt(valStr.replace(/,/g,''), 10);
             if(isNaN(val) || val < 0) return refreshDashboard(); 
             
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"));
-            let item = inv[currentLoggedInEmail][id];
+            let invMap = globalData.inventory || {};
+            let salesMap = globalData.sales || {};
+            let item = invMap[currentLoggedInEmail][id];
             
             const diff = val - item.stock;
             if (diff > 0) {
-                if (!sales[currentLoggedInEmail]) sales[currentLoggedInEmail] = { orderExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} };
-                sales[currentLoggedInEmail].orderExpense += (item.cost * diff);
+                if (!salesMap[currentLoggedInEmail]) salesMap[currentLoggedInEmail] = { orderExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} };
+                salesMap[currentLoggedInEmail].orderExpense += (item.cost * diff);
                 item.lastRestockDate = getLocalIsoDate();
-                localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
+                saveToDB('sales', salesMap);
             }
             item.stock = val;
-            inv[currentLoggedInEmail][id] = item;
-            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
-            refreshDashboard();
+            invMap[currentLoggedInEmail][id] = item;
+            saveToDB('inventory', invMap);
         }
 
         // ==========================================
@@ -1130,30 +1169,30 @@
             const dateStr = document.getElementById("batchSaleDate").value;
             if (isNaN(q) || q <= 0 || !dateStr) return alert("수량과 날짜 확인");
             
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {};
-            let item = inv[currentLoggedInEmail][batchTargetItemId];
+            let invMap = globalData.inventory || {};
+            let salesMap = globalData.sales || {};
+            let item = invMap[currentLoggedInEmail][batchTargetItemId];
             
             if (item.stock < q) return alert("현재고 초과!");
             item.stock -= q; item.totalSold = (item.totalSold || 0) + q;
-            inv[currentLoggedInEmail][batchTargetItemId] = item;
-            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
+            invMap[currentLoggedInEmail][batchTargetItemId] = item;
+            saveToDB('inventory', invMap);
             
-            if (!sales[currentLoggedInEmail].history) sales[currentLoggedInEmail].history = [];
+            if (!salesMap[currentLoggedInEmail].history) salesMap[currentLoggedInEmail].history = [];
             const rev = item.price * q;
-            sales[currentLoggedInEmail].history.unshift({ 
+            salesMap[currentLoggedInEmail].history.unshift({ 
                 historyId: "S_" + Date.now(), itemId: batchTargetItemId, name: item.name, 
                 qty: q, rev, date: dateStr, time: new Date().toLocaleTimeString() 
             });
             const d = new Date(dateStr); const days = ['일','월','화','수','목','금','토'];
-            sales[currentLoggedInEmail].weekdaySales[days[d.getDay()]] += q;
-            localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
+            salesMap[currentLoggedInEmail].weekdaySales[days[d.getDay()]] += q;
+            saveToDB('sales', salesMap);
             
-            closeBatchSaleModal(); refreshDashboard(); alert("반영 완료!");
+            closeBatchSaleModal(); alert("반영 완료!");
         }
 
         // ==========================================
-        // ★ 통계: 일자별, 월별 품목, 특정 요일 품목
+        // ★ 통계 및 리스트 렌더링
         // ==========================================
         function renderDailyDetailedStats() {
             const targetDate = document.getElementById("statsDatePicker").value;
@@ -1161,7 +1200,8 @@
             const summary = document.getElementById("dailyTotalSummary");
             if(!list || !summary) return; list.innerHTML = "";
             
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"))[currentLoggedInEmail] || { history: [] };
+            const salesMap = globalData.sales || {};
+            const sales = salesMap[currentLoggedInEmail] || { history: [] };
             const dailyData = {}; let dRev = 0, dQty = 0;
             
             if(sales.history) {
@@ -1191,7 +1231,8 @@
             const targetMonth = document.getElementById("statsMonthPicker").value;
             const list = document.getElementById("monthlyItemStatsList");
             if(!list) return; list.innerHTML = "";
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"))[currentLoggedInEmail] || { history: [] };
+            const salesMap = globalData.sales || {};
+            const sales = salesMap[currentLoggedInEmail] || { history: [] };
             
             const data = {}; let tQty = 0, tRev = 0;
             sales.history.forEach(h => {
@@ -1219,7 +1260,8 @@
             const targetWd = document.getElementById("statsWeekdayPicker").value;
             const list = document.getElementById("weekdayItemStatsList");
             if(!list) return; list.innerHTML = "";
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"))[currentLoggedInEmail] || { history: [] };
+            const salesMap = globalData.sales || {};
+            const sales = salesMap[currentLoggedInEmail] || { history: [] };
             
             const data = {}; let tQty = 0, tRev = 0;
             const days = ['일','월','화','수','목','금','토'];
@@ -1246,8 +1288,8 @@
         }
 
         function renderWeekdayStats() {
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {};
-            const mySale = sales[currentLoggedInEmail] || { history: [] };
+            const salesMap = globalData.sales || {};
+            const mySale = salesMap[currentLoggedInEmail] || { history: [] };
             let wd = {'일':{q:0,r:0}, '월':{q:0,r:0}, '화':{q:0,r:0}, '수':{q:0,r:0}, '목':{q:0,r:0}, '금':{q:0,r:0}, '토':{q:0,r:0}};
             const days = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -1290,8 +1332,8 @@
         }
 
         function renderMyInventory() {
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58")) || {};
-            const myInv = inv[currentLoggedInEmail] || {};
+            const invMap = globalData.inventory || {};
+            const myInv = invMap[currentLoggedInEmail] || {};
             const c = document.getElementById("myInventoryList");
             c.innerHTML = ""; let has = false;
             for (let k in myInv) {
@@ -1330,18 +1372,17 @@
 
         function deleteProduct(id) {
             if(!confirm("상품 목록에서 완전히 삭제하시겠습니까?")) return;
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
-            delete inv[currentLoggedInEmail][id];
-            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
-            refreshDashboard();
+            let invMap = globalData.inventory || {};
+            delete invMap[currentLoggedInEmail][id];
+            saveToDB('inventory', invMap);
         }
 
         // ==========================================
         // ★ 관리자(본사) 관제탑 패널
         // ==========================================
         function renderAdminDashboard() {
-            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
-            const allSales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {};
+            const users = globalData.users || {};
+            const allSales = globalData.sales || {};
             const container = document.getElementById("adminUserList");
             container.innerHTML = "";
             let count = 0;
@@ -1376,28 +1417,31 @@
 
         function deleteUser(id) {
             if (!confirm("해당 가맹점 계정과 데이터를 완전히 삭제하시겠습니까? 복구할 수 없습니다.")) return;
-            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58"));
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"));
-            const staffs = JSON.parse(localStorage.getItem("smart_stock_staffs_v58"));
+            let users = globalData.users || {};
+            let inv = globalData.inventory || {};
+            let sales = globalData.sales || {};
+            let staffs = globalData.staffs || {};
             
             delete users[id];
             if(inv[id]) delete inv[id];
             if(sales[id]) delete sales[id];
-            for(let staffEmail in staffs) { if(staffs[staffEmail].ownerEmail === id) delete staffs[staffEmail]; }
+            
+            for(let staffEmail in staffs) {
+                if(staffs[staffEmail].ownerEmail === id) delete staffs[staffEmail];
+            }
 
-            localStorage.setItem("smart_stock_users_v58", JSON.stringify(users));
-            localStorage.setItem("smart_stock_inventory_v58", JSON.stringify(inv));
-            localStorage.setItem("smart_stock_sales_v58", JSON.stringify(sales));
-            localStorage.setItem("smart_stock_staffs_v58", JSON.stringify(staffs));
-            renderAdminDashboard();
+            saveToDB('users', users);
+            saveToDB('inventory', inv);
+            saveToDB('sales', sales);
+            saveToDB('staffs', staffs);
+            alert("가맹점 삭제가 완료되었습니다.");
         }
 
         function openStoreInventory(id) {
             currentAdminModalUserId = id;
-            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58"));
-            const allInventories = JSON.parse(localStorage.getItem("smart_stock_inventory_v58"));
-            const allSales = JSON.parse(localStorage.getItem("smart_stock_sales_v58"));
+            const users = globalData.users || {};
+            const allInventories = globalData.inventory || {};
+            const allSales = globalData.sales || {};
             
             document.getElementById("modalStoreName").innerText = users[id].name;
             document.getElementById("modalStoreInfo").innerText = `${users[id].ownerName} / ${users[id].businessType}`;
@@ -1414,18 +1458,21 @@
                 list.innerHTML += `<div class="bg-white p-3 rounded-xl border flex justify-between text-xs mb-1.5 shadow-2xs"><span><b class="text-slate-800">${inv[k].name}</b><br><span class="text-[10px] text-slate-400">원가: ₩${inv[k].cost.toLocaleString()} / 판매가: ₩${inv[k].price.toLocaleString()}</span></span><span class="font-extrabold text-indigo-600">${inv[k].stock.toLocaleString()}개</span></div>`;
             }
             if(!hasItem) list.innerHTML = `<p class="text-center text-slate-400 py-4 text-xs">등록된 재고가 없습니다.</p>`;
+            
             document.getElementById("storeInventoryModal").classList.remove("hidden");
         }
         function closeStoreInventory() { document.getElementById("storeInventoryModal").classList.add("hidden"); currentAdminModalUserId = null; }
 
         function exportAdminToCSV() {
             if (!currentAdminModalUserId) return;
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58")) || {};
-            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
+            const inv = globalData.inventory || {};
+            const users = globalData.users || {};
             const storeName = users[currentAdminModalUserId]?.name || "가맹점";
             const myInv = inv[currentAdminModalUserId] || {};
             let csvContent = "\uFEFF" + `[관제탑] ${storeName} 재고/매출 장부\n상품명,카테고리,현재고,원가,판매가,총판매량\n`;
-            for (let k in myInv) { csvContent += `"${myInv[k].name}","${myInv[k].category}",${myInv[k].stock},${myInv[k].cost},${myInv[k].price},${myInv[k].totalSold||0}\n`; }
+            for (let k in myInv) { 
+                csvContent += `"${myInv[k].name}","${myInv[k].category}",${myInv[k].stock},${myInv[k].cost},${myInv[k].price},${myInv[k].totalSold||0}\n`; 
+            }
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `${storeName}_장부_${new Date().toISOString().slice(0,10)}.csv`;
@@ -1438,28 +1485,25 @@
         function openSubscriptionModal() { document.getElementById("subscriptionModal").classList.remove("hidden"); }
         function closeSubscriptionModal() { document.getElementById("subscriptionModal").classList.add("hidden"); }
         function payMonthlySubscription() {
-            const subs = JSON.parse(localStorage.getItem("smart_stock_subs_v58")) || {};
+            let subs = globalData.subs || {};
             subs[currentLoggedInEmail] = { active: true, date: new Date().toLocaleDateString() };
-            localStorage.setItem("smart_stock_subs_v58", JSON.stringify(subs));
-            closeSubscriptionModal(); refreshDashboard(); alert("🎉 PRO 멤버십 결제가 완료되었습니다!");
+            saveToDB('subs', subs);
+            closeSubscriptionModal(); alert("🎉 PRO 멤버십 결제가 완료되었습니다!");
         }
 
         function refreshDashboard() {
-            const sales = JSON.parse(localStorage.getItem("smart_stock_sales_v58")) || {};
-            const inv = JSON.parse(localStorage.getItem("smart_stock_inventory_v58")) || {};
-            const users = JSON.parse(localStorage.getItem("smart_stock_users_v58")) || {};
-            const subs = JSON.parse(localStorage.getItem("smart_stock_subs_v58")) || {};
-            const currentUser = users[currentLoggedInEmail];
+            const salesMap = globalData.sales || {};
+            const invMap = globalData.inventory || {};
+            const usersMap = globalData.users || {};
+            const subsMap = globalData.subs || {};
+            const currentUser = usersMap[currentLoggedInEmail];
 
             if (currentUser && currentUser.role === "owner") {
-                document.getElementById("storeInviteCodeDisplay").innerText = currentUser.storeCode;
-                document.getElementById("storeInviteCodeDisplay2").innerText = currentUser.storeCode;
-
-                const mySale = sales[currentLoggedInEmail] || { history: [] };
+                const mySale = salesMap[currentLoggedInEmail] || { history: [] };
                 let totalRev = 0; let totalOrder = 0; let totalWaste = 0;
                 if(mySale.history) { mySale.history.forEach(h => totalRev += h.rev); }
-                if(inv[currentLoggedInEmail]) {
-                    Object.values(inv[currentLoggedInEmail]).forEach(item => {
+                if(invMap[currentLoggedInEmail]) {
+                    Object.values(invMap[currentLoggedInEmail]).forEach(item => {
                         totalOrder += (item.cost * (item.stock + item.totalSold)); 
                     });
                 }
@@ -1477,7 +1521,7 @@
                 }
                 document.getElementById("todaySoldSummaryText").innerText = `${tq.toLocaleString()}개 (₩${tr.toLocaleString()})`;
 
-                const isPro = subs[currentLoggedInEmail]?.active;
+                const isPro = subsMap[currentLoggedInEmail]?.active;
                 const proPitchBanner = document.getElementById("proPitchBanner");
                 if (isPro) {
                     if(proPitchBanner) proPitchBanner.classList.add("hidden");
