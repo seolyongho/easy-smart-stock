@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Easy Smart Stock - 클라우드 완전판 ERP v63</title>
+    <title>Easy Smart Stock - 직영점/가맹점 분리 관리 ERP v64</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -161,8 +161,8 @@
             </div>
         </div>
 
-        <!-- 판매 정산 모달 -->
-        <div id="batchSaleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+        <!-- ★ 관리자/사장님 공용 판매 정산 모달 (z-index 60으로 올려서 장부 모달보다 위에 뜨게 함) -->
+        <div id="batchSaleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-[60]">
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4 border border-slate-100">
                 <h3 class="font-extrabold text-lg text-slate-900" id="batchModalTitle">상품 판매 정산</h3>
                 <p class="text-xs text-slate-500" id="batchModalStockInfo">현재고: 0개</p>
@@ -242,7 +242,7 @@
                 <i class="fa-solid fa-store text-indigo-400 mr-2.5 text-lg" id="headerIcon"></i>
                 <span id="headerTitle">스마트 재고 관리</span>
             </div>
-            <!-- ★ 완벽 로그아웃 버튼 -->
+            <!-- 완벽 로그아웃 버튼 -->
             <button onclick="logout()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-2 rounded-xl border border-slate-700 font-semibold transition">로그아웃</button>
         </header>
 
@@ -430,7 +430,7 @@
                 </div>
             </div>
 
-            <!-- [탭 5] 총괄 관리자(관제탑) -->
+            <!-- [탭 5] 총괄 관리자(관제탑) - ★ 직영점/가맹점 분리 적용! -->
             <div id="adminSection" class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-5 hidden">
                 <div class="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
                     <div>
@@ -440,13 +440,17 @@
                     <span class="text-[10px] text-white font-bold bg-slate-800 px-2.5 py-1 rounded-lg">만능 마스터</span>
                 </div>
                 
-                <div class="mb-5 p-4 border-2 border-indigo-100 rounded-2xl bg-indigo-50 flex justify-between items-center shadow-xs">
-                    <div>
-                        <p class="font-bold text-sm text-slate-950 mb-0.5"><i class="fa-solid fa-store mr-1 text-indigo-600"></i> 본사 직영 매장</p>
-                    </div>
-                    <button onclick="openStoreInventory('seolyh0328')" class="bg-indigo-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">가게 관리</button>
+                <!-- 직영점 섹션 -->
+                <div class="mb-4">
+                    <h4 class="font-extrabold text-sm text-indigo-800 flex items-center mb-3"><i class="fa-solid fa-store mr-1.5"></i> 본사 직영 매장 (재고 수정 권한 부여됨)</h4>
+                    <div id="adminDirectStores" class="space-y-3"></div>
                 </div>
-                <div id="adminUserList" class="space-y-4"></div>
+                
+                <!-- 일반 가맹점 섹션 -->
+                <div class="mt-6 border-t border-slate-100 pt-4">
+                    <h4 class="font-extrabold text-sm text-slate-800 flex items-center mb-3"><i class="fa-solid fa-store-alt mr-1.5"></i> 일반 가맹점</h4>
+                    <div id="adminNormalStores" class="space-y-3"></div>
+                </div>
             </div>
         </main>
 
@@ -477,14 +481,14 @@
         let globalData = { users: {}, inventory: {}, sales: {}, staffs: {}, schedules: {}, subs: {} };
         let isFirebaseInitialized = false;
 
+        // ★ 관리자용 공용 변수 추가
+        let batchTargetEmail = null;
+
         function saveToDB(collectionKey, dataObj) {
             globalData[collectionKey] = dataObj;
             db.collection("easy_smart_stock").doc(collectionKey).set(dataObj).catch(e => console.error("DB 저장 에러:", e));
         }
 
-        // ==========================================
-        // ★ AI 10만 도매 매칭 엔진 (v63 부활!!)
-        // ==========================================
         function getAIRecommendations(q) {
             const brands = {
                 "빵": ["삼립 정통 크림빵", "샤니 꿀호떡", "파리바게뜨 토스트식빵", "뚜레쥬르 옥수수식빵", "냉동 크로와상 생지(50입)", "업소용 햄버거번(30입)"],
@@ -516,7 +520,7 @@
         function executeMigration() {
             const oldUsers = localStorage.getItem("smart_stock_users_v60") || localStorage.getItem("smart_stock_users_v59") || localStorage.getItem("smart_stock_users_v58") || localStorage.getItem("smart_stock_users_v57");
             
-            if (oldUsers && !localStorage.getItem("migrated_to_v63_cloud")) {
+            if (oldUsers && !localStorage.getItem("migrated_to_v64_cloud")) {
                 console.log("기존 내장 메모리 데이터 -> 구글 클라우드로 복구 시작!");
                 
                 const u = JSON.parse(oldUsers || '{}');
@@ -533,7 +537,7 @@
                 saveToDB('schedules', sc);
                 saveToDB('subs', su);
                 
-                localStorage.setItem("migrated_to_v63_cloud", "true");
+                localStorage.setItem("migrated_to_v64_cloud", "true");
                 alert("🎉 [시스템 알림] 폰 내장 메모리에 있던 기존 '재고' 및 '알바생' 데이터를 구글 클라우드로 완벽하게 복구했습니다!\n다시 로그인 해주세요.");
                 logout(); 
             }
@@ -581,7 +585,7 @@
 
                 if (!isFirebaseInitialized) {
                     isFirebaseInitialized = true;
-                    executeMigration(); // ★ 앱 켜지자마자 옛날 데이터 싹 다 클라우드로 쏴버림!
+                    executeMigration();
                     document.getElementById('firebaseLoading').classList.add('hidden');
                     initSystem(); 
                 } else {
@@ -597,6 +601,10 @@
                             if (staffData) updateStaffUI(staffData);
                         } else if (selectedRole === 'admin') {
                             renderAdminDashboard();
+                            // 관리자 장부 모달이 켜져있을 경우 화면 갱신
+                            if(currentAdminModalUserId && !document.getElementById("storeInventoryModal").classList.contains("hidden")) {
+                                openStoreInventory(currentAdminModalUserId);
+                            }
                         }
                     }
                 }
@@ -604,7 +612,7 @@
         });
 
         function initSystem() {
-            const autoLogin = localStorage.getItem("smart_stock_autologin_v63");
+            const autoLogin = localStorage.getItem("smart_stock_autologin_v64");
             if (autoLogin) {
                 try {
                     const sd = JSON.parse(autoLogin);
@@ -623,7 +631,7 @@
                         return;
                     }
                 } catch(e) { 
-                    localStorage.removeItem("smart_stock_autologin_v63"); 
+                    localStorage.removeItem("smart_stock_autologin_v64"); 
                 }
             }
             
@@ -635,12 +643,13 @@
             }
         }
 
-        // 강력한 로그아웃 버튼 (모든 과거 버전 찌꺼기 완벽 삭제)
+        // 강력한 로그아웃 버튼
         function logout() {
             localStorage.removeItem("smart_stock_autologin_v60");
             localStorage.removeItem("smart_stock_autologin_v61");
             localStorage.removeItem("smart_stock_autologin_v62"); 
-            localStorage.removeItem("smart_stock_autologin_v63"); // 최신 버전 삭제
+            localStorage.removeItem("smart_stock_autologin_v63");
+            localStorage.removeItem("smart_stock_autologin_v64"); // v64 삭제
             currentLoggedInEmail = null;
             location.reload();
         }
@@ -761,7 +770,8 @@
                 role: "owner", password: pw, name: document.getElementById("signupName").value, storeCode,
                 ownerName: document.getElementById("signupOwnerName").value,
                 phone: phone, birth: birth,
-                businessType: document.getElementById("signupBusinessType").value
+                businessType: document.getElementById("signupBusinessType").value,
+                isDirectStore: false // ★ 기본은 일반 가맹점
             };
             saveToDB('users', users);
 
@@ -813,14 +823,14 @@
                 const staffs = globalData.staffs || {};
                 if (staffs[email] && staffs[email].password === pw) {
                     currentLoggedInEmail = email;
-                    if (remember) localStorage.setItem("smart_stock_autologin_v63", JSON.stringify({ email, pw, role: 'staff' }));
+                    if (remember) localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: 'staff' }));
                     enterStaffApp(staffs[email]);
                 } else alert("로그인 실패");
             } else {
                 const users = globalData.users || {};
                 if (users[email] && users[email].role === selectedRole && users[email].password === pw) {
                     currentLoggedInEmail = email;
-                    if (remember) localStorage.setItem("smart_stock_autologin_v63", JSON.stringify({ email, pw, role: selectedRole }));
+                    if (remember) localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: selectedRole }));
                     enterApp(users[email]);
                 } else alert("로그인 실패");
             }
@@ -1070,7 +1080,82 @@
         }
 
         // ==========================================
-        // ★ 직관적 검색 및 재고 추가 로직
+        // ★ 공용(사장님/관리자) 재고 조작 함수 통합
+        // ==========================================
+        
+        function updateItemDate(id, field, val) {
+            // ★ 관리자(admin) 권한으로 열었을 때는 모달 대상 아이디를 타겟으로 함
+            const targetEmail = (selectedRole === 'admin' && currentAdminModalUserId) ? currentAdminModalUserId : currentLoggedInEmail;
+            let invMap = globalData.inventory || {};
+            invMap[targetEmail][id][field] = val;
+            saveToDB('inventory', invMap);
+        }
+
+        function directAdjustStock(itemId, action) {
+            const targetEmail = (selectedRole === 'admin' && currentAdminModalUserId) ? currentAdminModalUserId : currentLoggedInEmail;
+            const amtStr = prompt(action === 'add' ? "간편 입고 수량:" : action === 'sub' ? "간편 출고/폐기 수량:" : "변경 재고량:");
+            if(amtStr === null) return; const amt = parseInt(amtStr, 10); if(isNaN(amt) || amt < 0) return;
+
+            let invMap = globalData.inventory || {};
+            let salesMap = globalData.sales || {};
+            let item = invMap[targetEmail][itemId];
+
+            if(action === 'add') { 
+                item.stock += amt; 
+                item.lastRestockDate = getLocalIsoDate();
+                salesMap[targetEmail].orderExpense += (item.cost * amt); 
+            }
+            else if(action === 'sub') { if(item.stock < amt) return alert("재고 부족"); item.stock -= amt; }
+            else { item.stock = amt; }
+
+            invMap[targetEmail][itemId] = item;
+            saveToDB('inventory', invMap);
+            saveToDB('sales', salesMap);
+            
+            if (selectedRole === 'admin') openStoreInventory(targetEmail);
+            else refreshDashboard();
+        }
+
+        function directSetStock(id, valStr) {
+            const targetEmail = (selectedRole === 'admin' && currentAdminModalUserId) ? currentAdminModalUserId : currentLoggedInEmail;
+            const val = parseInt(valStr.replace(/,/g,''), 10);
+            if(isNaN(val) || val < 0) {
+                if (selectedRole === 'admin') openStoreInventory(targetEmail); else refreshDashboard();
+                return; 
+            }
+            
+            let invMap = globalData.inventory || {};
+            let salesMap = globalData.sales || {};
+            let item = invMap[targetEmail][id];
+            
+            const diff = val - item.stock;
+            if (diff > 0) {
+                if (!salesMap[targetEmail]) salesMap[targetEmail] = { orderExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} };
+                salesMap[targetEmail].orderExpense += (item.cost * diff);
+                item.lastRestockDate = getLocalIsoDate();
+                saveToDB('sales', salesMap);
+            }
+            item.stock = val;
+            invMap[targetEmail][id] = item;
+            saveToDB('inventory', invMap);
+            
+            if (selectedRole === 'admin') openStoreInventory(targetEmail);
+            else refreshDashboard();
+        }
+
+        function deleteProduct(id) {
+            if(!confirm("상품 목록에서 완전히 삭제하시겠습니까?")) return;
+            const targetEmail = (selectedRole === 'admin' && currentAdminModalUserId) ? currentAdminModalUserId : currentLoggedInEmail;
+            let invMap = globalData.inventory || {};
+            delete invMap[targetEmail][id];
+            saveToDB('inventory', invMap);
+            
+            if (selectedRole === 'admin') openStoreInventory(targetEmail);
+            else refreshDashboard();
+        }
+
+        // ==========================================
+        // ★ 직관적 검색 및 재고 추가 로직 (사장님 전용)
         // ==========================================
         function handleSearch() {
             const q = document.getElementById("searchInput").value.trim();
@@ -1083,7 +1168,6 @@
             const invMap = globalData.inventory || {};
             const inv = invMap[currentLoggedInEmail] || {};
             
-            // 안전하게 필터링 (i.name이 혹시라도 없으면 에러 방지)
             let myItems = Object.keys(inv).map(id => ({id, ...inv[id]})).filter(i => i.name && i.name.toLowerCase().includes(qLower));
             let master = getAIRecommendations(q).filter(i => !myItems.find(m => m.name === i.name));
             
@@ -1125,7 +1209,6 @@
             const costStr = document.getElementById("newProductCost").value.replace(/,/g, '');
             const priceStr = document.getElementById("newProductPrice").value.replace(/,/g, '');
             
-            // 값을 안 적었으면 자동으로 0원 처리해서 등록되게 수정!
             const cost = parseInt(costStr, 10) || 0;
             const price = parseInt(priceStr, 10) || 0;
             
@@ -1149,62 +1232,17 @@
             alert("등록 완료! 아래 목록에서 수량을 조절하세요.");
             document.getElementById("newProductForm").classList.add("hidden"); 
             document.getElementById("searchInput").value = "";
-            refreshDashboard(); // 화면 즉시 갱신
-        }
-
-        function updateItemDate(id, field, val) {
-            let invMap = globalData.inventory || {};
-            invMap[currentLoggedInEmail][id][field] = val;
-            saveToDB('inventory', invMap);
-        }
-
-        function directAdjustStock(itemId, action) {
-            const amtStr = prompt(action === 'add' ? "간편 입고 수량:" : action === 'sub' ? "간편 출고/폐기 수량:" : "변경 재고량:");
-            if(amtStr === null) return; const amt = parseInt(amtStr, 10); if(isNaN(amt) || amt < 0) return;
-
-            let invMap = globalData.inventory || {};
-            let salesMap = globalData.sales || {};
-            let item = invMap[currentLoggedInEmail][itemId];
-
-            if(action === 'add') { 
-                item.stock += amt; 
-                item.lastRestockDate = getLocalIsoDate();
-                salesMap[currentLoggedInEmail].orderExpense += (item.cost * amt); 
-            }
-            else if(action === 'sub') { if(item.stock < amt) return alert("재고 부족"); item.stock -= amt; }
-            else { item.stock = amt; }
-
-            invMap[currentLoggedInEmail][itemId] = item;
-            saveToDB('inventory', invMap);
-            saveToDB('sales', salesMap);
-        }
-
-        function directSetStock(id, valStr) {
-            const val = parseInt(valStr.replace(/,/g,''), 10);
-            if(isNaN(val) || val < 0) return refreshDashboard(); 
-            
-            let invMap = globalData.inventory || {};
-            let salesMap = globalData.sales || {};
-            let item = invMap[currentLoggedInEmail][id];
-            
-            const diff = val - item.stock;
-            if (diff > 0) {
-                if (!salesMap[currentLoggedInEmail]) salesMap[currentLoggedInEmail] = { orderExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} };
-                salesMap[currentLoggedInEmail].orderExpense += (item.cost * diff);
-                item.lastRestockDate = getLocalIsoDate();
-                saveToDB('sales', salesMap);
-            }
-            item.stock = val;
-            invMap[currentLoggedInEmail][id] = item;
-            saveToDB('inventory', invMap);
+            refreshDashboard(); 
         }
 
         // ==========================================
-        // ★ 과거 보정 가능한 판매 정산 모달
+        // ★ 과거 보정 가능한 판매 정산 모달 (공용)
         // ==========================================
         function openBatchSaleModal(id) {
             batchTargetItemId = id;
-            document.getElementById("batchModalTitle").innerText = `판매 정산 (과거 보정가능)`;
+            batchTargetEmail = (selectedRole === 'admin' && currentAdminModalUserId) ? currentAdminModalUserId : currentLoggedInEmail;
+            
+            document.getElementById("batchModalTitle").innerText = `상품 판매 정산`;
             document.getElementById("batchSaleDate").value = getLocalIsoDate();
             document.getElementById("batchSaleInput").value = "";
             document.getElementById("batchSaleModal").classList.remove("hidden");
@@ -1219,24 +1257,26 @@
             
             let invMap = globalData.inventory || {};
             let salesMap = globalData.sales || {};
-            let item = invMap[currentLoggedInEmail][batchTargetItemId];
+            let item = invMap[batchTargetEmail][batchTargetItemId];
             
             if (item.stock < q) return alert("현재고 초과!");
             item.stock -= q; item.totalSold = (item.totalSold || 0) + q;
-            invMap[currentLoggedInEmail][batchTargetItemId] = item;
+            invMap[batchTargetEmail][batchTargetItemId] = item;
             saveToDB('inventory', invMap);
             
-            if (!salesMap[currentLoggedInEmail].history) salesMap[currentLoggedInEmail].history = [];
+            if (!salesMap[batchTargetEmail].history) salesMap[batchTargetEmail].history = [];
             const rev = item.price * q;
-            salesMap[currentLoggedInEmail].history.unshift({ 
+            salesMap[batchTargetEmail].history.unshift({ 
                 historyId: "S_" + Date.now(), itemId: batchTargetItemId, name: item.name, 
                 qty: q, rev, date: dateStr, time: new Date().toLocaleTimeString() 
             });
             const d = new Date(dateStr); const days = ['일','월','화','수','목','금','토'];
-            salesMap[currentLoggedInEmail].weekdaySales[days[d.getDay()]] += q;
+            salesMap[batchTargetEmail].weekdaySales[days[d.getDay()]] += q;
             saveToDB('sales', salesMap);
             
-            closeBatchSaleModal(); alert("반영 완료!");
+            closeBatchSaleModal(); 
+            if (selectedRole === 'admin') { openStoreInventory(batchTargetEmail); alert("반영 완료!"); }
+            else { refreshDashboard(); alert("반영 완료!"); }
         }
 
         // ==========================================
@@ -1418,46 +1458,66 @@
             renderBestSellers(myInv);
         }
 
-        function deleteProduct(id) {
-            if(!confirm("상품 목록에서 완전히 삭제하시겠습니까?")) return;
-            let invMap = globalData.inventory || {};
-            delete invMap[currentLoggedInEmail][id];
-            saveToDB('inventory', invMap);
-        }
-
+        // ==========================================
+        // ★ 관리자(본사) 관제탑 패널 (직영점/가맹점 분리 적용)
+        // ==========================================
         function renderAdminDashboard() {
             const users = globalData.users || {};
             const allSales = globalData.sales || {};
-            const container = document.getElementById("adminUserList");
-            container.innerHTML = "";
-            let count = 0;
+            const directContainer = document.getElementById("adminDirectStores");
+            const normalContainer = document.getElementById("adminNormalStores");
+            
+            directContainer.innerHTML = "";
+            normalContainer.innerHTML = "";
+            
+            let directCount = 0;
+            let normalCount = 0;
+            
             for (let id in users) {
                 if (users[id].role === "owner") {
-                    count++;
                     const u = users[id];
                     const sale = allSales[id] || { revenue: 0, orderExpense: 0, wasteExpense: 0 };
                     const net = sale.revenue - sale.orderExpense - sale.wasteExpense;
+                    const isDirect = u.isDirectStore;
                     
-                    container.innerHTML += `
-                        <div class="p-4 border rounded-2xl bg-white shadow-2xs space-y-2 text-xs mb-3">
-                            <div class="flex justify-between items-center border-b pb-2 mb-2">
-                                <b class="text-sm text-slate-900">${u.name}</b> 
-                                <span class="bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-lg">코드: ${u.storeCode}</span>
+                    const cardHTML = `
+                        <div class="p-4 border rounded-2xl ${isDirect ? 'bg-indigo-50 border-indigo-200' : 'bg-white shadow-2xs'} space-y-2 text-xs mb-3">
+                            <div class="flex justify-between items-center border-b ${isDirect ? 'border-indigo-100' : 'border-slate-100'} pb-2 mb-2">
+                                <b class="text-sm ${isDirect ? 'text-indigo-900' : 'text-slate-900'}">${u.name}</b> 
+                                <span class="bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-lg border border-indigo-100">코드: ${u.storeCode}</span>
                             </div>
-                            <p class="text-slate-500">대표: ${u.ownerName} | ${u.phone} | 업종: ${u.businessType}</p>
-                            <div class="bg-slate-50 p-2 rounded-xl grid grid-cols-2 gap-2 text-center mt-2">
+                            <p class="${isDirect ? 'text-indigo-700' : 'text-slate-500'}">대표: ${u.ownerName} | ${u.phone} | 업종: ${u.businessType}</p>
+                            <div class="${isDirect ? 'bg-white' : 'bg-slate-50'} p-2 rounded-xl grid grid-cols-2 gap-2 text-center mt-2 border ${isDirect ? 'border-indigo-100' : 'border-transparent'}">
                                 <div><span class="block text-[10px] text-slate-400">총매출</span><b class="text-slate-800">₩${sale.revenue.toLocaleString()}</b></div>
                                 <div><span class="block text-[10px] text-slate-400">순수익</span><b class="text-emerald-600">₩${net.toLocaleString()}</b></div>
                             </div>
                             <div class="flex gap-2 pt-2">
-                                <button onclick="openStoreInventory('${id}')" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl font-bold shadow">장부/엑셀 상세조회</button>
-                                <button onclick="deleteUser('${id}')" class="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl border border-rose-100 font-bold"><i class="fa-solid fa-trash"></i> 삭제</button>
+                                <button onclick="openStoreInventory('${id}')" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl font-bold shadow hover:bg-indigo-700 transition">장부/재고 관리</button>
+                                <button onclick="toggleDirectStore('${id}')" class="flex-1 ${isDirect ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-700'} py-2 rounded-xl font-bold shadow-sm transition">${isDirect ? '일반매장 변경' : '직영매장 설정'}</button>
+                                <button onclick="deleteUser('${id}')" class="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl border border-rose-100 font-bold hover:bg-rose-100 transition"><i class="fa-solid fa-trash"></i></button>
                             </div>
                         </div>
                     `;
+                    
+                    if (isDirect) {
+                        directContainer.innerHTML += cardHTML;
+                        directCount++;
+                    } else {
+                        normalContainer.innerHTML += cardHTML;
+                        normalCount++;
+                    }
                 }
             }
-            if(count === 0) container.innerHTML = `<p class="text-center text-slate-400 py-6">등록된 가맹점이 없습니다.</p>`;
+            if(directCount === 0) directContainer.innerHTML = `<p class="text-center text-slate-400 py-4 text-xs">설정된 본사 직영 매장이 없습니다.</p>`;
+            if(normalCount === 0) normalContainer.innerHTML = `<p class="text-center text-slate-400 py-4 text-xs">등록된 일반 가맹점이 없습니다.</p>`;
+        }
+
+        // 직영 매장 <-> 일반 가맹점 토글 함수
+        function toggleDirectStore(id) {
+            let users = globalData.users || {};
+            users[id].isDirectStore = !users[id].isDirectStore;
+            saveToDB('users', users);
+            // Firebase가 0.1초만에 renderAdminDashboard 자동 갱신해줌!
         }
 
         function deleteUser(id) {
@@ -1470,15 +1530,9 @@
             delete users[id];
             if(inv[id]) delete inv[id];
             if(sales[id]) delete sales[id];
-            
-            for(let staffEmail in staffs) {
-                if(staffs[staffEmail].ownerEmail === id) delete staffs[staffEmail];
-            }
+            for(let staffEmail in staffs) { if(staffs[staffEmail].ownerEmail === id) delete staffs[staffEmail]; }
 
-            saveToDB('users', users);
-            saveToDB('inventory', inv);
-            saveToDB('sales', sales);
-            saveToDB('staffs', staffs);
+            saveToDB('users', users); saveToDB('inventory', inv); saveToDB('sales', sales); saveToDB('staffs', staffs);
             alert("가맹점 삭제가 완료되었습니다.");
         }
 
@@ -1488,7 +1542,9 @@
             const allInventories = globalData.inventory || {};
             const allSales = globalData.sales || {};
             
-            document.getElementById("modalStoreName").innerText = users[id].name;
+            const isDirect = users[id].isDirectStore; // ★ 직영점인지 확인
+            
+            document.getElementById("modalStoreName").innerText = users[id].name + (isDirect ? " (본사 직영)" : "");
             document.getElementById("modalStoreInfo").innerText = `${users[id].ownerName} / ${users[id].businessType}`;
             document.getElementById("modalRevenue").innerText = `₩ ${(allSales[id]?.revenue || 0).toLocaleString()}`;
             document.getElementById("modalCost").innerText = `₩ ${(allSales[id]?.orderExpense || 0).toLocaleString()}`;
@@ -1500,12 +1556,38 @@
             let hasItem = false;
             for (let k in inv) {
                 hasItem = true;
-                list.innerHTML += `<div class="bg-white p-3 rounded-xl border flex justify-between text-xs mb-1.5 shadow-2xs"><span><b class="text-slate-800">${inv[k].name}</b><br><span class="text-[10px] text-slate-400">원가: ₩${inv[k].cost.toLocaleString()} / 판매가: ₩${inv[k].price.toLocaleString()}</span></span><span class="font-extrabold text-indigo-600">${inv[k].stock.toLocaleString()}개</span></div>`;
+                const item = inv[k];
+                if (isDirect) {
+                    // ★ 직영점일 경우 관리자도 재고 수정/정산/삭제 100% 가능하게 렌더링
+                    list.innerHTML += `
+                    <div class="p-4 border rounded-2xl bg-white space-y-3 text-xs shadow-sm mb-2">
+                        <div class="flex justify-between items-center">
+                            <div><b class="text-sm text-slate-900">${item.name}</b> <span class="text-[10px] text-slate-400 ml-1">단가 ₩${item.price.toLocaleString()}</span></div>
+                        </div>
+                        <div class="bg-amber-50 p-2 rounded-lg border border-amber-100 grid grid-cols-2 gap-2 text-[10px] mt-1 mb-1">
+                            <label class="flex flex-col text-amber-800 font-semibold">📦 최근 입고일 <input type="date" value="${item.lastRestockDate || ''}" onchange="updateItemDate('${k}', 'lastRestockDate', this.value)" class="mt-0.5 p-1 rounded bg-white border border-amber-200 focus:outline-none"></label>
+                            <label class="flex flex-col text-rose-600 font-bold">⏳ 소비기한 <input type="date" value="${item.expiryDate || ''}" onchange="updateItemDate('${k}', 'expiryDate', this.value)" class="mt-0.5 p-1 rounded bg-white border border-rose-200 focus:outline-none"></label>
+                        </div>
+                        <div class="flex items-center gap-2 pt-1">
+                            <button onclick="directAdjustStock('${k}', 'sub')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200 transition">-</button>
+                            <input type="text" value="${item.stock.toLocaleString()}" onchange="directSetStock('${k}', this.value)" class="w-16 h-8 border border-slate-300 rounded-lg text-center text-sm font-bold bg-white focus:outline-none focus:border-indigo-600">
+                            <button onclick="directAdjustStock('${k}', 'add')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200 transition">+</button>
+                            <div class="flex-1 flex justify-end gap-1.5">
+                                <button onclick="openBatchSaleModal('${k}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg shadow transition">정산</button>
+                                <button onclick="deleteProduct('${k}')" class="bg-rose-50 text-rose-600 font-bold px-3 py-1.5 rounded-lg border border-rose-200"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>`;
+                } else {
+                    // ★ 일반 가맹점일 경우 기존처럼 보기 전용
+                    list.innerHTML += `<div class="bg-white p-3 rounded-xl border flex justify-between text-xs mb-1.5 shadow-2xs"><span><b class="text-slate-800">${item.name}</b><br><span class="text-[10px] text-slate-400">원가: ₩${item.cost.toLocaleString()} / 판매가: ₩${item.price.toLocaleString()}</span></span><span class="font-extrabold text-indigo-600">${item.stock.toLocaleString()}개</span></div>`;
+                }
             }
             if(!hasItem) list.innerHTML = `<p class="text-center text-slate-400 py-4 text-xs">등록된 재고가 없습니다.</p>`;
             
             document.getElementById("storeInventoryModal").classList.remove("hidden");
         }
+
         function closeStoreInventory() { document.getElementById("storeInventoryModal").classList.add("hidden"); currentAdminModalUserId = null; }
 
         function exportAdminToCSV() {
