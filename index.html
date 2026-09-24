@@ -826,7 +826,7 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("알바생 가입 완료!"); closeStaffSignupModal();
         }
 
-        function handleLogin(e) {
+       function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById("loginEmail").value.trim();
   const pw = document.getElementById("loginPw").value;
@@ -835,21 +835,36 @@ document.addEventListener("DOMContentLoaded", () => {
   // 파이어베이스 공식 로그인 시도!
   firebase.auth().signInWithEmailAndPassword(email, pw)
     .then((userCredential) => {
-      // 로그인 성공
-      currentLoggedInEmail = email;
       
-      if (remember) {
-        localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: selectedRole }));
-      }
-
-      // 파이어베이스가 보안 문을 열고 데이터를 가져올 시간을 1초 정도 준 뒤에 화면을 넘김
+      // 파이어베이스가 보안 문을 열어주면 1초 뒤에 '데이터 짝'이 맞는지 깐깐하게 검사
       setTimeout(() => {
         if (selectedRole === 'staff') {
           const staffData = globalData.staffs ? globalData.staffs[email] : null;
-          enterStaffApp(staffData || { email: email });
+          
+          // 알바생으로 로그인했는데 알바생 데이터가 없으면 컷!
+          if (!staffData) {
+            alert("등록된 알바생 정보가 없어! 사장님께 먼저 앱에서 알바생 등록을 요청해 줘.");
+            firebase.auth().signOut(); // 강제로 다시 로그아웃 시켜버림
+            return;
+          }
+          
+          currentLoggedInEmail = email;
+          if (remember) localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: selectedRole }));
+          enterStaffApp(staffData);
+
         } else {
           const usersData = globalData.users ? globalData.users[email] : null;
-          enterApp(usersData || { email: email, role: selectedRole });
+          
+          // 사장님/관리자로 로그인했는데 데이터가 없거나, 선택한 권한이 다르면 컷!
+          if (!usersData || usersData.role !== selectedRole) {
+            alert("선택한 권한(사장님/관리자)과 계정 정보가 맞지 않아!");
+            firebase.auth().signOut(); // 강제로 다시 로그아웃
+            return;
+          }
+
+          currentLoggedInEmail = email;
+          if (remember) localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: selectedRole }));
+          enterApp(usersData);
         }
       }, 1000);
     })
