@@ -827,26 +827,37 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById("loginEmail").value.trim();
-            const pw = document.getElementById("loginPw").value;
-            const remember = document.getElementById("rememberMe").checked;
+  e.preventDefault();
+  const email = document.getElementById("loginEmail").value.trim();
+  const pw = document.getElementById("loginPw").value;
+  const remember = document.getElementById("rememberMe").checked;
 
-            if (selectedRole === 'staff') {
-                const staffs = globalData.staffs || {};
-                if (staffs[email] && staffs[email].password === pw) {
-                    currentLoggedInEmail = email;
-                    if (remember) localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: 'staff' }));
-                    enterStaffApp(staffs[email]);
-                } else alert("로그인 실패");
-            } else {
-                const users = globalData.users || {};
-                if (users[email] && users[email].role === selectedRole && users[email].password === pw) {
-                    currentLoggedInEmail = email;
-                    if (remember) localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: selectedRole }));
-                    enterApp(users[email]);
-                } else alert("로그인 실패");
-            }
+  // 파이어베이스 공식 로그인 시도!
+  firebase.auth().signInWithEmailAndPassword(email, pw)
+    .then((userCredential) => {
+      // 로그인 성공
+      currentLoggedInEmail = email;
+      
+      if (remember) {
+        localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: selectedRole }));
+      }
+
+      // 파이어베이스가 보안 문을 열고 데이터를 가져올 시간을 1초 정도 준 뒤에 화면을 넘김
+      setTimeout(() => {
+        if (selectedRole === 'staff') {
+          const staffData = globalData.staffs ? globalData.staffs[email] : null;
+          enterStaffApp(staffData || { email: email });
+        } else {
+          const usersData = globalData.users ? globalData.users[email] : null;
+          enterApp(usersData || { email: email, role: selectedRole });
+        }
+      }, 1000);
+    })
+    .catch((error) => {
+      alert("로그인 실패! 이메일과 비밀번호를 다시 확인해 줘.");
+      console.error("로그인 에러:", error);
+    });
+}
         }
 
         function enterApp(user) {
