@@ -1059,14 +1059,62 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         function closeOwnerCalendarModal() { document.getElementById("ownerCalendarModal").classList.add("hidden"); }
         
-        function ownerEditDateSchedule(email, dateStr, containerId) {
-            let schMap = globalData.schedules || {};
-            if (!schMap[email]) schMap[email] = {};
-            const input = prompt(`[${dateStr}] 근무 시간을 자유롭게 적으세요 (예: 09:00~18:00)\n※ 칸을 완전히 비우면 휴무(삭제) 처리됩니다.`, schMap[email][dateStr]||"");
-            if (input === null) return;
-            if (input.trim() === "") delete schMap[email][dateStr]; else schMap[email][dateStr] = input.trim();
-            saveToDB('schedules', schMap);
-        }
+       // ★ 팝업창에서 쓸 변수들 (기억장치)
+let currentSchEmail = "";
+let currentSchDate = "";
+let currentSchContainer = "";
+
+// ★ 기존 prompt 경고창 함수(1062줄 근처) 덮어쓰기! 
+function addSchedule(email, dateStr, containerId) { 
+    currentSchEmail = email;
+    currentSchDate = dateStr;
+    currentSchContainer = containerId;
+    
+    let schMap = globalData.schedules || {};
+    let mySch = schMap[email] || {};
+    let existingTime = mySch[dateStr] || ""; 
+    
+    // 기존에 등록된 시간이 있으면 모달 시계에 미리 세팅
+    if(existingTime && existingTime.includes("-")) {
+        let times = existingTime.split("-");
+        document.getElementById("schStartTime").value = times[0].trim();
+        document.getElementById("schEndTime").value = times[1].trim();
+    } else {
+        document.getElementById("schStartTime").value = "";
+        document.getElementById("schEndTime").value = "";
+    }
+    
+    document.getElementById("scheduleModalTitle").innerText = `[${dateStr}] 근무 시간`;
+    document.getElementById("scheduleModal").classList.remove("hidden"); 
+}
+
+// ★ 저장하기 버튼 기능
+function saveSchedule() {
+    let start = document.getElementById("schStartTime").value;
+    let end = document.getElementById("schEndTime").value;
+    
+    if(!start || !end) return alert("출근과 퇴근 시간을 모두 선택해주세요!");
+    
+    let schMap = globalData.schedules || {};
+    if (!schMap[currentSchEmail]) schMap[currentSchEmail] = {};
+    
+    schMap[currentSchEmail][currentSchDate] = `${start}-${end}`;
+    saveToDB('schedules', schMap);
+    
+    document.getElementById("scheduleModal").classList.add("hidden");
+    renderCalendar(currentSchContainer, currentSchEmail, 'owner');
+}
+
+// ★ 휴무(삭제) 버튼 기능
+function deleteSchedule() {
+    let schMap = globalData.schedules || {};
+    if (schMap[currentSchEmail] && schMap[currentSchEmail][currentSchDate]) {
+        delete schMap[currentSchEmail][currentSchDate];
+        saveToDB('schedules', schMap);
+    }
+    document.getElementById("scheduleModal").classList.add("hidden");
+    renderCalendar(currentSchContainer, currentSchEmail, 'owner');
+}
 
         // ==========================================
         // ★ 사장님 전용 알바생 관리
@@ -1731,6 +1779,23 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
     </script>
+    <!-- ★ 출퇴근 시간 선택 모달창 시작 -->
+<div id="scheduleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <h3 class="font-extrabold text-lg text-slate-900" id="scheduleModalTitle">근무 시간 설정</h3>
+        <div class="flex space-x-2 items-center">
+            <input type="time" id="schStartTime" class="w-full border border-slate-200 rounded-xl p-3 text-lg font-bold text-indigo-900 focus:outline-none focus:border-indigo-600">
+            <span class="font-bold text-slate-400">~</span>
+            <input type="time" id="schEndTime" class="w-full border border-slate-200 rounded-xl p-3 text-lg font-bold text-indigo-900 focus:outline-none focus:border-indigo-600">
+        </div>
+        <div class="flex space-x-2 pt-4">
+            <button onclick="deleteSchedule()" class="flex-1 py-3.5 bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold rounded-xl transition">휴무(삭제)</button>
+            <button onclick="saveSchedule()" class="flex-1 py-3.5 bg-indigo-600 text-white hover:bg-indigo-700 font-bold rounded-xl shadow-lg shadow-indigo-200 transition">저장하기</button>
+        </div>
+        <button onclick="document.getElementById('scheduleModal').classList.add('hidden')" class="w-full pt-2 pb-1 text-slate-400 hover:text-slate-600 font-bold text-sm underline decoration-slate-300">취소</button>
+    </div>
+</div>
+<!-- ★ 출퇴근 시간 선택 모달창 끝 -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
