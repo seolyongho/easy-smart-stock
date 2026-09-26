@@ -1065,15 +1065,28 @@ let currentSchDate = "";
 let currentSchContainer = "";
 
 // ★ 기존 prompt 경고창 함수(1062줄 근처) 덮어쓰기! 
-// ★ 이름이 달라도 다 받아주게 만든 호환용 함수
-function addSchedule(email, dateStr, containerId) {
-    onCalendarCellClick(email, dateStr, containerId);
-}
-function editSchedule(email, dateStr, containerId) {
-    onCalendarCellClick(email, dateStr, containerId);
-}
-function openSchedule(email, dateStr, containerId) {
-    onCalendarCellClick(email, dateStr, containerId);
+// ★ 사장님 달력 클릭 시 무조건 실행되게 만든 핵심 함수
+function ownerEditDateSchedule(email, dateStr, containerId) {
+    currentSchEmail = email;
+    currentSchDate = dateStr;
+    currentSchContainer = containerId;
+    
+    let schMap = globalData.schedules || {};
+    let mySch = schMap[email] || {};
+    let existingTime = mySch[dateStr] || ""; 
+    
+    // 기존에 등록된 시간이 있으면 시계에 미리 띄워주기
+    if(existingTime && existingTime.includes("-")) {
+        let times = existingTime.split("-");
+        document.getElementById("schStartTime").value = times[0].trim();
+        document.getElementById("schEndTime").value = times[1].trim();
+    } else {
+        document.getElementById("schStartTime").value = "";
+        document.getElementById("schEndTime").value = "";
+    }
+    
+    document.getElementById("scheduleModalTitle").innerText = `[${dateStr}] 근무 시간`;
+    document.getElementById("scheduleModal").classList.remove("hidden"); // 모달 팝업 뿅!
 }
 
 // ★ 진짜 작동할 핵심 함수
