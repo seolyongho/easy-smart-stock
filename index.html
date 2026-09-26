@@ -762,38 +762,70 @@ document.addEventListener("DOMContentLoaded", () => {
             else { isIdChecked = true; msg.className = "text-[11px] mt-1 block font-bold text-emerald-600"; msg.innerText = "✅ 사용 가능"; }
         }
 
-        function handleSignup(e) {
-            e.preventDefault();
-            const email = document.getElementById("signupEmail").value.trim();
-            if (!isIdChecked) return alert("중복 확인을 하세요");
-            const pw = document.getElementById("signupPw").value;
-            if (pw !== document.getElementById("signupPwConfirm").value) return alert("비밀번호 불일치");
-            
-            const birth = document.getElementById("signupBirth").value.trim();
-            if(birth.length !== 8) return alert("생년월일은 숫자 8자리로 정확히 입력해주세요. (예: 19801225)");
-            
-            const phone = document.getElementById("signupPhone").value.trim();
-            if(phone.length !== 13) return alert("전화번호를 끝까지 정확히 입력해주세요.");
+       function handleSignup(e) {
+    e.preventDefault();
+    const email = document.getElementById("signupEmail").value.trim();
+    if (!isIdChecked) return alert("중복 확인을 하세요");
 
+    const pw = document.getElementById("signupPw").value;
+    if (pw !== document.getElementById("signupPwConfirm").value) return alert("비밀번호 불일치~");
+
+    const birth = document.getElementById("signupBirth").value.trim();
+    if(birth.length !== 8) return alert("생년월일은 숫자 8자리로 정확히 입력해주세요. (예: 19801225)");
+
+    const phone = document.getElementById("signupPhone").value.trim();
+    if(phone.length !== 13) return alert("전화번호를 끝까지 정확히 입력해주세요.");
+
+    // ★ 파이어베이스 공식 인증(Auth) 가입 처리 시작!
+    firebase.auth().createUserWithEmailAndPassword(email, pw)
+        .then((userCredential) => {
             let users = globalData.users || {};
-            let storeCode = ""; const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            
+            // 랜덤 매장 고유코드 4자리 생성
+            let storeCode = ""; 
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             for (let i = 0; i < 4; i++) storeCode += chars.charAt(Math.floor(Math.random() * chars.length));
 
-            users[email] = { 
-                role: "owner", password: pw, name: document.getElementById("signupName").value, storeCode,
+            // 데이터베이스에 사장님 정보 저장
+            users[email] = {
+                role: "owner", 
+                password: pw, 
+                name: document.getElementById("signupName").value, 
+                storeCode: storeCode, // 랜덤 코드 저장!
                 ownerName: document.getElementById("signupOwnerName").value,
-                phone: phone, birth: birth,
+                phone: phone, 
+                birth: birth,
                 businessType: document.getElementById("signupBusinessType").value,
-                isDirectStore: false // ★ 기본은 일반 가맹점
+                isDirectStore: false // 기본은 일반 가맹점
             };
             saveToDB('users', users);
 
+            // 기존 재고, 매출 데이터 초기화 로직 유지
             let inv = globalData.inventory || {}; inv[email] = {}; saveToDB('inventory', inv);
-            let sales = globalData.sales || {}; sales[email] = { revenue: 0, orderExpense: 0, wasteExpense: 0, history: [], weekdaySales: {"일":0,"월":0,"화":0,"수":0,"목":0,"금":0,"토":0} }; saveToDB('sales', sales);
+            let sales = globalData.sales || {}; 
+            sales[email] = { 
+                revenue: 0, orderExpense: 0, wasteExpense: 0, history: [], 
+                weekdaySales: {"월":0,"화":0,"수":0,"목":0,"금":0,"토":0,"일":0} 
+            }; 
+            saveToDB('sales', sales);
 
+            // 가입 완료 알림 및 모달 닫기
             alert(`가입 완료! 매장 코드: [${storeCode}]`);
             closeSignupModal();
-        }
+            
+            // 바로 로그인되지 않도록 로그아웃 처리 (로그인 화면에서 직접 로그인 유도)
+            firebase.auth().signOut();
+        })
+        .catch((error) => {
+            if (error.code === 'auth/email-already-in-use') {
+                alert("이미 가입된 이메일입니다. 다른 이메일을 사용해주세요.");
+            } else if (error.code === 'auth/weak-password') {
+                alert("비밀번호는 6자리 이상이어야 합니다.");
+            } else {
+                alert("회원가입 실패: " + error.message);
+            }
+        });
+}
 
         function handleStaffSignup(e) {
             e.preventDefault();
