@@ -2020,10 +2020,13 @@ function directAdjustStock(itemId, action) {
                 }
             });
         }
+        
+        const summaryTextEl = document.getElementById("todaysoldsummaryText");
+        if (summaryTextEl) {
+            summaryTextEl.innerText = `수량: ${tq.toLocaleString()}개 / 매출: ₩ ${tr.toLocaleString()}`;
+        }
     }
 }
-                document.getElementById("todaySoldSummaryText").innerText = `${tq.toLocaleString()}개 (₩${tr.toLocaleString()})`;
-
                 const isPro = subsMap[currentLoggedInEmail]?.active;
                 const proPitchBanner = document.getElementById("proPitchBanner");
                 if (isPro) {
