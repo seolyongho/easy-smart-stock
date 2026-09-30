@@ -1701,62 +1701,72 @@ function deleteSchedule() {
         }
 
         function renderMyInventory() {
-            const invMap = globalData.inventory || {};
-            const myInv = invMap[currentLoggedInEmail] || {};
-            const c = document.getElementById("myInventoryList");
-            c.innerHTML = ""; let has = false;
-            for (let k in myInv) {
-                has = true; const item = myInv[k]; const so = calculateSmartOrder(item);
-                let badge = item.stock === 0 ? `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded font-extrabold">🚨 품절</span>` :
-                            item.stock < so.effectiveDaily * 3 ? `<span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold">⚠️ 임박</span>` :
-                            `<span class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-bold">✅ 여유</span>`;
+        const invMap = globalData.inventory || {};
+        const myInv = invMap[currentLoggedInEmail] || {};
+        const c = document.getElementById("myInventoryList");
+        
+        // ★ 최상단에 '전체 선택' 및 '선택 삭제' 메뉴 바 추가
+        c.innerHTML = `
+        <div class="flex justify-between items-center bg-slate-100 p-2.5 rounded-xl mb-4 shadow-sm border border-slate-200">
+            <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                <input type="checkbox" onchange="toggleAll(this)" class="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500"> 
+                전체 선택
+            </label>
+            <button onclick="deleteSelected()" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-extrabold shadow-sm">
+                🗑️ 선택 일괄 삭제
+            </button>
+        </div>`;
+        
+        let has = false;
+        for (let k in myInv) {
+            has = true; const item = myInv[k]; const so = calculateSmartOrder(item);
+            let badge = item.stock === 0 ? `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded font-extrabold">🚨 품절</span>` :
+                        item.stock < so.effectiveDaily * 3 ? `<span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold">⚠️ 임박</span>` :
+                        `<span class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-bold">✅ 여유</span>`;
 
-                c.innerHTML += `
-                    <div class="p-4 border rounded-2xl bg-white space-y-3 text-xs shadow-sm">
-                        <div class="flex justify-between items-center">
-                            <div><b class="text-sm text-slate-900">${item.name}</b> <span class="text-[10px] text-slate-400 ml-1">단가 ₩${item.price.toLocaleString()}</span></div>
-                        </div>
-                        <!-- ✨ 엑셀에서 가져온 12가지 상세 데이터 대시보드 ✨ -->
-            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 grid grid-cols-3 gap-2 text-[10px] my-2">
-                <div class="flex flex-col text-slate-600"><span>📦 현재고</span> <b class="text-sm text-slate-900">${item.stock || 0}개</b></div>
-                <div class="flex flex-col text-slate-600"><span>📈 판매수량</span> <b class="text-slate-900">${item.salesQty || 0}개</b></div>
-                <div class="flex flex-col text-slate-600"><span>📊 기말재고</span> <b class="text-slate-900">${item.avgEndStock || 0}개</b></div>
+            c.innerHTML += `
+            <div class="p-4 border rounded-2xl bg-white space-y-3 text-xs shadow-sm relative">
+                <!-- ★ 개별 체크박스 -->
+                <input type="checkbox" class="product-chk absolute top-4 right-4 w-5 h-5 cursor-pointer" value="${k}">
                 
-                <div class="flex flex-col text-rose-500"><span>🚨 품절(일/수량)</span> <b>${item.outOfStockDays || 0}일 / ${item.outOfStockQty || 0}개</b></div>
-                <div class="flex flex-col text-orange-500"><span>🗑️ 폐기(일/수량)</span> <b>${item.disposalDays || 0}일 / ${item.disposalQty || 0}개</b></div>
-                <div class="flex flex-col text-emerald-600"><span>💰 판매이익</span> <b>₩${(item.salesProfit || 0).toLocaleString()}</b></div>
-                
-                <div class="flex flex-col text-rose-500"><span>📉 품절손실</span> <b>₩${(item.outOfStockLoss || 0).toLocaleString()}</b></div>
-                <div class="flex flex-col text-orange-500"><span>📉 폐기손실</span> <b>₩${(item.disposalLoss || 0).toLocaleString()}</b></div>
-                <div class="flex flex-col text-slate-500"><span>💼 재고비용</span> <b>₩${(item.inventoryCost || 0).toLocaleString()}</b></div>
-                
-                <div class="col-span-3 flex justify-between items-center bg-indigo-50 text-indigo-700 p-2 rounded-md mt-1 border border-indigo-100">
-                    <span class="font-bold">✨ 종합 순이익</span>
-                    <b class="text-sm">₩${(item.netProfit || 0).toLocaleString()}</b>
+                <div class="flex justify-between items-center pr-8">
+                    <div><b class="text-sm text-slate-900">${item.name}</b> <span class="text-[10px] text-slate-400 ml-1">단가 ₩${(item.price||0).toLocaleString()}</span></div>
                 </div>
-            </div>
-                        
-                        <div class="bg-amber-50 p-2 rounded-lg border border-amber-100 grid grid-cols-2 gap-2 text-[10px] mt-1 mb-1">
-                            <label class="flex flex-col text-amber-800 font-semibold">📦 최근 입고일 <input type="date" value="${item.lastRestockDate || ''}" onchange="updateItemDate('${k}', 'lastRestockDate', this.value)" class="mt-0.5 p-1 rounded bg-white border border-amber-200 focus:outline-none"></label>
-                            <label class="flex flex-col text-rose-600 font-bold">⏳ 소비기한 <input type="date" value="${item.expiryDate || ''}" onchange="updateItemDate('${k}', 'expiryDate', this.value)" class="mt-0.5 p-1 rounded bg-white border border-rose-200 focus:outline-none"></label>
-                        </div>
-                        
-                        <div class="flex items-center gap-2 pt-1">
-                            <button onclick="directAdjustStock('${k}', 'sub')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200 transition">-</button>
-                            <input type="text" id="quickStock_${k}" value="${item.stock.toLocaleString()}" onchange="directSetStock('${k}', this.value)" class="w-16 h-8 border border-slate-300 rounded-lg text-center text-sm font-bold bg-white focus:outline-none focus:border-indigo-600">
-                            <button onclick="directAdjustStock('${k}', 'add')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200 transition">+</button>
-                            <div class="flex-1 flex justify-end gap-1.5">
-                                <button onclick="openBatchSaleModal('${k}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg shadow transition">정산</button>
-                                <button onclick="deleteProduct('${k}')" class="bg-rose-50 text-rose-600 font-bold px-3 py-1.5 rounded-lg border border-rose-200"><i class="fa-solid fa-trash"></i></button>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">${badge} <span class="text-slate-500">주간 권장발주: <b>${so.weeklyNeeded.toLocaleString()}개</b></span></div>
-                    </div>`;
-            }
-            if (!has) c.innerHTML = `<p class="text-slate-400 text-center py-6">보유 중인 상품이 없습니다.</p>`;
-            renderBestSellers(myInv);
+                
+                <!-- 대시보드 -->
+                <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 grid grid-cols-3 gap-2 text-[10px] my-2">
+                    <div class="flex flex-col text-slate-600"><span>📦 현재고</span> <b class="text-sm text-slate-900">${item.stock || 0}개</b></div>
+                    <div class="flex flex-col text-slate-600"><span>📈 판매수량</span> <b class="text-slate-900">${item.salesQty || 0}개</b></div>
+                    <div class="flex flex-col text-slate-600"><span>📊 기말재고</span> <b class="text-slate-900">${item.avgEndStock || 0}개</b></div>
+                    <div class="flex flex-col text-rose-500"><span>🚨 품절(일/수량)</span> <b>${item.outOfStockDays || 0}일 / ${item.outOfStockQty || 0}개</b></div>
+                    <div class="flex flex-col text-orange-500"><span>🗑️ 폐기(일/수량)</span> <b>${item.disposalDays || 0}일 / ${item.disposalQty || 0}개</b></div>
+                    <div class="flex flex-col text-emerald-600"><span>💰 판매이익</span> <b>₩${(item.salesProfit || 0).toLocaleString()}</b></div>
+                    <div class="flex flex-col text-rose-500"><span>📉 품절손실</span> <b>₩${(item.outOfStockLoss || 0).toLocaleString()}</b></div>
+                    <div class="flex flex-col text-orange-500"><span>📉 폐기손실</span> <b>₩${(item.disposalLoss || 0).toLocaleString()}</b></div>
+                    <div class="flex flex-col text-slate-500"><span>💼 재고비용</span> <b>₩${(item.inventoryCost || 0).toLocaleString()}</b></div>
+                    <div class="col-span-3 flex justify-between items-center bg-indigo-50 text-indigo-700 p-2 rounded-md mt-1 border border-indigo-100">
+                        <span class="font-bold">✨ 종합 순이익</span>
+                        <b class="text-sm">₩${(item.netProfit || 0).toLocaleString()}</b>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2 pt-1">
+                    <button onclick="directAdjustStock('${k}', 'sub')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200">-</button>
+                    <input type="text" id="quickStock_${k}" value="${(item.stock||0).toLocaleString()}" onchange="directSetStock('${k}', this.value)" class="w-10 h-8 text-center border border-slate-200 rounded-lg text-xs font-bold focus:outline-indigo-500">
+                    <button onclick="directAdjustStock('${k}', 'add')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200">+</button>
+                    
+                    <div class="flex-1 flex justify-end gap-1">
+                        <!-- ★ 데이터 수정 버튼 추가 -->
+                        <button onclick="openDataEditModal('${k}')" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm text-[10px]">✏️수정</button>
+                        <button onclick="openBatchSaleModal('${k}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm text-[10px]">💰정산</button>
+                        <button onclick="deleteProduct('${k}')" class="bg-rose-50 text-rose-600 font-bold px-2.5 py-1.5 rounded-lg border border-rose-200 shadow-sm text-[10px]">삭제</button>
+                    </div>
+                </div>
+            </div>`;
         }
+        if (!has) c.innerHTML = '<p class="text-slate-400 text-center py-6">보유 중인 상품이 없습니다.</p>';
+        renderBestSellers(myInv);
+    }
 
         // ==========================================
         // ★ 관리자(본사) 관제탑 패널 (직영점/가맹점 분리 적용)
@@ -1988,5 +1998,88 @@ function deleteSchedule() {
     });
   }
 </script>
+    <!-- ★ 데이터 수동 수정 모달 -->
+    <div id="dataEditModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-[70]">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="font-extrabold text-lg text-slate-900">✏️ 데이터 직접 수정</h3>
+            <input type="hidden" id="editItemKey">
+            <div class="grid grid-cols-2 gap-3" id="editInputsContainer">
+                <!-- JS로 자동 생성됨 -->
+            </div>
+            <div class="flex gap-2 pt-4">
+                <button onclick="document.getElementById('dataEditModal').classList.add('hidden')" class="flex-1 py-3 bg-slate-100 font-bold rounded-2xl text-slate-600">취소</button>
+                <button onclick="saveDataEdit()" class="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-2xl shadow">💾 저장</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // 1. 전체 선택/해제 기능
+    function toggleAll(source) {
+        const checkboxes = document.querySelectorAll('.product-chk');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+    }
+
+    // 2. 다중 선택 일괄 삭제 기능
+    function deleteSelected() {
+        const checkboxes = document.querySelectorAll('.product-chk:checked');
+        if (checkboxes.length === 0) return alert("삭제할 상품을 먼저 체크해주세요!");
+        if (!confirm(`선택한 ${checkboxes.length}개 상품을 정말 삭제하시겠습니까?\n(삭제 후 복구 불가능)`)) return;
+
+        let invMap = globalData.inventory || {};
+        checkboxes.forEach(cb => {
+            delete invMap[currentLoggedInEmail][cb.value];
+        });
+        saveToDB('inventory', invMap);
+        alert(`${checkboxes.length}개 상품이 일괄 삭제되었습니다!`);
+        renderMyInventory(); // 화면 갱신
+    }
+
+    // 3. 수정 모달 열기 기능
+    function openDataEditModal(k) {
+        const item = globalData.inventory[currentLoggedInEmail][k];
+        document.getElementById('editItemKey').value = k;
+        
+        const fields = [
+            { id: 'edit_stock', label: '현재고', val: item.stock || 0 },
+            { id: 'edit_salesQty', label: '판매수량', val: item.salesQty || 0 },
+            { id: 'edit_salesProfit', label: '판매이익(₩)', val: item.salesProfit || 0 },
+            { id: 'edit_disposalLoss', label: '폐기손실(₩)', val: item.disposalLoss || 0 },
+            { id: 'edit_netProfit', label: '순이익(₩)', val: item.netProfit || 0 }
+        ];
+
+        let html = '';
+        fields.forEach(f => {
+            html += `
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">${f.label}</label>
+                <input type="number" id="${f.id}" value="${f.val}" class="w-full border rounded-xl p-2 text-sm focus:outline-indigo-500">
+            </div>`;
+        });
+        document.getElementById('editInputsContainer').innerHTML = html;
+        document.getElementById('dataEditModal').classList.remove('hidden');
+    }
+
+    // 4. 수정한 데이터 DB에 덮어쓰기
+    function saveDataEdit() {
+        const k = document.getElementById('editItemKey').value;
+        let invMap = globalData.inventory || {};
+        let item = invMap[currentLoggedInEmail][k];
+
+        // 입력칸 숫자 가져와서 업데이트
+        item.stock = parseInt(document.getElementById('edit_stock').value, 10) || 0;
+        item.salesQty = parseInt(document.getElementById('edit_salesQty').value, 10) || 0;
+        item.salesProfit = parseInt(document.getElementById('edit_salesProfit').value, 10) || 0;
+        item.disposalLoss = parseInt(document.getElementById('edit_disposalLoss').value, 10) || 0;
+        item.netProfit = parseInt(document.getElementById('edit_netProfit').value, 10) || 0;
+
+        invMap[currentLoggedInEmail][k] = item;
+        saveToDB('inventory', invMap);
+        
+        document.getElementById('dataEditModal').classList.add('hidden');
+        alert("성공적으로 수정되었습니다!");
+        renderMyInventory();
+    }
+    </script>
 </body>
 </html>
