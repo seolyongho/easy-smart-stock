@@ -1403,30 +1403,7 @@ function deleteSchedule() {
         } else if (action === 'sub') {
             if ((Number(item.stock) || 0) < amt) {
                 alert("재고가 부족합니다!");
-                return;
-            }
-            item.stock -= amt;
-        } else {
-            item.stock = amt;
-        }
-
-        invMap[targetEmail][itemId] = item;
-        saveToDB('inventory', invMap);
-        saveToDB('sales', salesMap);
-
-        if (selectedRole === 'admin') openStoreInventory(targetEmail);
-        else refreshDashboard();
-    }
-            else if(action === 'sub') { if(item.stock < amt) return alert("재고 부족"); item.stock -= amt; }
-            else { item.stock = amt; }
-
-            invMap[targetEmail][itemId] = item;
-            saveToDB('inventory', invMap);
-            saveToDB('sales', salesMap);
-            
-            if (selectedRole === 'admin') openStoreInventory(targetEmail);
-            else refreshDashboard();
-        }
+               
 
         function directSetStock(id, valStr) {
             const targetEmail = (selectedRole === 'admin' && currentAdminModalUserId) ? currentAdminModalUserId : currentLoggedInEmail;
