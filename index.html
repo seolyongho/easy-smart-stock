@@ -2031,7 +2031,7 @@ function directAdjustStock(itemId, action) {
     } catch (err) {
         console.error("refreshDashboard error:", err);
     }
-}
+
                 const isPro = subsMap[currentLoggedInEmail]?.active;
                 const proPitchBanner = document.getElementById("proPitchBanner");
                 if (isPro) {
@@ -2045,8 +2045,8 @@ function directAdjustStock(itemId, action) {
                 if(!document.getElementById("tabContentStats").classList.contains("hidden")) {
                     renderDailyDetailedStats(); renderMonthlyItemStats(); renderWeekdayItemStats();
                 }
-            }
-        }
+            
+        
     
     </script>
     <!-- ★ 출퇴근 시간 선택 모달창 시작 -->
