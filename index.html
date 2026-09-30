@@ -172,25 +172,26 @@
             </div>
         </div>
 
-        <!-- ★ 관리자/사장님 공용 판매 정산 모달 (z-index 60으로 올려서 장부 모달보다 위에 뜨게 함) -->
-        <div id="batchSaleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-[60]">
-            <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4 border border-slate-100">
-                <h3 class="font-extrabold text-lg text-slate-900" id="batchModalTitle">상품 판매 정산</h3>
-                <p class="text-xs text-slate-500" id="batchModalStockInfo">현재고: 0개</p>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">정산 기준 날짜 (과거 보정 시 수정)</label>
-                    <input type="date" id="batchSaleDate" class="w-full border rounded-xl p-3 text-sm focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">판매 수량 입력</label>
-                    <input type="text" id="batchSaleInput" oninput="formatCurrencyInput(this)" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="팔린 수량 입력">
-                </div>
-                <div class="flex gap-2 pt-2">
-                    <button onclick="closeBatchSaleModal()" class="flex-1 py-3.5 bg-slate-100 font-bold rounded-2xl text-sm">취소</button>
-                    <button onclick="confirmBatchSale()" class="flex-1 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl text-sm shadow">정산 반영</button>
+       <!-- ★ 상품 판매 및 폐기 처리 모달 -->
+            <div id="batchSaleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-[60]">
+                <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4 border border-slate-100">
+                    <h3 class="font-extrabold text-lg text-slate-900" id="batchModalTitle">상품 판매 / 폐기 처리</h3>
+                    <p class="text-xs text-slate-500" id="batchModalStockInfo">현재고: 0개</p>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">기준 날짜</label>
+                        <input type="date" id="batchSaleDate" class="w-full border rounded-xl p-3 text-sm focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">처리 수량</label>
+                        <input type="number" id="batchSaleInput" class="w-full border rounded-xl p-3 text-sm focus:outline-none" placeholder="수량을 입력하세요 (예: 3)">
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button onclick="closeBatchSaleModal()" class="flex-1 py-3.5 bg-slate-100 font-bold rounded-2xl text-slate-600">취소</button>
+                        <button onclick="processTransaction('dispose')" class="flex-1 py-3.5 bg-orange-500 text-white font-bold rounded-2xl shadow">🗑️ 폐기</button>
+                        <button onclick="processTransaction('sale')" class="flex-1 py-3.5 bg-emerald-600 text-white font-bold rounded-2xl shadow">💰 판매</button>
+                    </div>
                 </div>
             </div>
-        </div>
 
         <!-- 사장님 달력 스케줄 모달 -->
         <div id="ownerCalendarModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4 z-50">
@@ -1504,35 +1505,60 @@ function deleteSchedule() {
         }
         function closeBatchSaleModal() { document.getElementById("batchSaleModal").classList.add("hidden"); }
 
-        function confirmBatchSale() {
-            const qStr = document.getElementById("batchSaleInput").value.replace(/,/g, '');
-            const q = parseInt(qStr, 10);
-            const dateStr = document.getElementById("batchSaleDate").value;
-            if (isNaN(q) || q <= 0 || !dateStr) return alert("수량과 날짜 확인");
-            
-            let invMap = globalData.inventory || {};
-            let salesMap = globalData.sales || {};
-            let item = invMap[batchTargetEmail][batchTargetItemId];
-            
-            if (item.stock < q) return alert("현재고 초과!");
-            item.stock -= q; item.totalSold = (item.totalSold || 0) + q;
-            invMap[batchTargetEmail][batchTargetItemId] = item;
-            saveToDB('inventory', invMap);
-            
-            if (!salesMap[batchTargetEmail].history) salesMap[batchTargetEmail].history = [];
-            const rev = item.price * q;
-            salesMap[batchTargetEmail].history.unshift({ 
-                historyId: "S_" + Date.now(), itemId: batchTargetItemId, name: item.name, 
-                qty: q, rev, date: dateStr, time: new Date().toLocaleTimeString() 
-            });
-            const d = new Date(dateStr); const days = ['일','월','화','수','목','금','토'];
-            salesMap[batchTargetEmail].weekdaySales[days[d.getDay()]] += q;
-            saveToDB('sales', salesMap);
-            
-            closeBatchSaleModal(); 
-            if (selectedRole === 'admin') { openStoreInventory(batchTargetEmail); alert("반영 완료!"); }
-            else { refreshDashboard(); alert("반영 완료!"); }
+     // ★ 판매 및 폐기 만능 통합 처리 함수
+    function processTransaction(type) {
+        const q = parseInt(document.getElementById("batchSaleInput").value, 10);
+        const dateStr = document.getElementById("batchSaleDate").value;
+
+        if (isNaN(q) || q <= 0 || !dateStr) return alert("수량과 날짜를 정확히 입력해주세요!");
+
+        let invMap = globalData.inventory || {};
+        let salesMap = globalData.sales || {};
+        let item = invMap[batchTargetEmail][batchTargetItemId];
+
+        if (item.stock < q) return alert("현재고보다 많은 수량을 처리할 수 없습니다!");
+
+        // 1. 공통: 재고 차감
+        item.stock -= q;
+
+        let amount = 0;
+        // 2. 판매 vs 폐기 데이터 분기 처리
+        if (type === 'sale') {
+            item.salesQty = (item.salesQty || 0) + q;
+            amount = (item.price || 0) * q;
+            item.salesProfit = (item.salesProfit || 0) + amount;
+            item.netProfit = (item.netProfit || 0) + amount; // 판매 시 순이익 증가
+        } else if (type === 'dispose') {
+            item.disposalQty = (item.disposalQty || 0) + q;
+            amount = (item.cost || 0) * q; // 폐기 손실은 매입원가 기준
+            item.disposalLoss = (item.disposalLoss || 0) + amount;
+            item.netProfit = (item.netProfit || 0) - amount; // 폐기 시 순이익 감소
         }
+
+        // DB에 변경된 재고/이익 데이터 저장
+        invMap[batchTargetEmail][batchTargetItemId] = item;
+        saveToDB('inventory', invMap);
+
+        // 3. 히스토리(기록) 남기기
+        if (!salesMap[batchTargetEmail]) salesMap[batchTargetEmail] = { history: [] };
+        if (!salesMap[batchTargetEmail].history) salesMap[batchTargetEmail].history = [];
+        
+        salesMap[batchTargetEmail].history.unshift({
+            historyId: type + "_" + Date.now(),
+            itemId: batchTargetItemId,
+            name: item.name,
+            type: type === 'sale' ? '판매' : '폐기',
+            qty: q,
+            amount: amount,
+            date: dateStr,
+            time: new Date().toLocaleTimeString()
+        });
+        saveToDB('sales', salesMap);
+
+        alert(`정상적으로 ${type === 'sale' ? '판매' : '폐기'} 처리되었습니다!`);
+        closeBatchSaleModal();
+        renderMyInventory(); // ✨ 화면 즉시 엑셀 데이터 대시보드로 새로고침!
+    }
 
         // ==========================================
         // ★ 통계 및 리스트 렌더링
