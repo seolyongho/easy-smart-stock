@@ -41,11 +41,11 @@
             <p class="text-sm text-slate-500 font-medium">클라우드 실시간 동기화 ERP 시스템</p>
         </div>
 
-        <!-- 탭 메뉴 -->
+       <!-- 탭 메뉴 -->
         <div class="flex rounded-2xl bg-slate-100 p-1 mb-6">
-            <button type="button" id="tabOwner" onclick="selectRole('owner')" class="flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-indigo-600 shadow-sm transition">가맹점 / 사장님</button>
-            <button type="button" id="tabStaff" onclick="selectRole('staff')" class="flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition">알바생(직원)</button>
-            <button type="button" id="tabAdmin" onclick="selectRole('admin')" class="flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition">총괄 본사</button>
+            <button type="button" id="tabOwner" onclick="switchLoginRole('owner')" class="flex-1 py-2.5 text-sm font-bold rounded-xl bg-white text-indigo-600 shadow-sm transition">가맹점 / 사장님</button>
+            <button type="button" id="tabStaff" onclick="switchLoginRole('staff')" class="flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition">알바생(직원)</button>
+            <button type="button" id="tabAdmin" onclick="switchLoginRole('admin')" class="flex-1 py-2.5 text-sm font-bold rounded-xl text-slate-500 hover:text-slate-700 transition">총괄 본사</button>
         </div>
 
         <!-- 로그인 폼 -->
