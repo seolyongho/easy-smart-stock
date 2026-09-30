@@ -7,7 +7,8 @@
     <title>Easy Smart Stock - 직영점/가맹점 분리 관리 ERP v64</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <!-- 엑셀 파일 읽어오는 라이브러리 (SheetJS) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- ★ Firebase SDK 추가 -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -39,23 +40,23 @@
                 <p class="text-slate-500 text-xs mt-1">클라우드 실시간 동기화 ERP 시스템</p>
             </div>
 
-            <div class="flex rounded-2xl bg-slate-100 p-1 mb-6">
+             class="flex rounded-2xl bg-slate-100 p-1 mb-6">
                 <button type="button" id="tabOwner" onclick="switchLoginRole('owner')" class="flex-1 py-3 text-xs font-bold rounded-xl bg-white text-indigo-600 shadow-sm transition">가맹점 / 사장님</button>
                 <button type="button" id="tabStaff" onclick="switchLoginRole('staff')" class="flex-1 py-3 text-xs font-bold rounded-xl text-slate-500 transition">알바생(직원)</button>
                 <button type="button" id="tabAdmin" onclick="switchLoginRole('admin')" class="flex-1 py-3 text-xs font-bold rounded-xl text-slate-500 transition">총괄 본사</button>
             </div>
 
             <form onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
+                >
                     <label class="block text-xs font-semibold text-slate-600 mb-1">아이디</label>
                     <input type="text" id="loginEmail" required class="w-full border border-slate-200 rounded-2xl p-3.5 text-sm focus:border-indigo-600 focus:outline-none bg-slate-50/50" placeholder="아이디 입력">
                 </div>
-                <div>
+                >
                     <label class="block text-xs font-semibold text-slate-600 mb-1">비밀번호</label>
                     <input type="password" id="loginPw" required class="w-full border border-slate-200 rounded-2xl p-3.5 text-sm focus:border-indigo-600 focus:outline-none bg-slate-50/50" placeholder="비밀번호 입력">
                 </div>
-                <div class="flex items-center justify-between pt-1">
-                    <div class="flex items-center">
+                 class="flex items-center justify-between pt-1">
+                     class="flex items-center">
                         <input type="checkbox" id="rememberMe" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" checked>
                         <label for="rememberMe" class="ml-2 text-xs text-slate-600 font-semibold cursor-pointer">로그인 유지</label>
                     </div>
@@ -66,9 +67,9 @@
                 </button>
             </form>
 
-            <div id="signupPrompt" class="mt-6 text-center space-y-2">
-                <div><span class="text-xs text-slate-500">사장님이신가요?</span><button type="button" onclick="openSignupModal()" class="text-xs font-bold text-indigo-600 ml-2 hover:underline">가맹점 회원가입</button></div>
-                <div><span class="text-xs text-slate-500">알바생이신가요?</span><button type="button" onclick="openStaffSignupModal()" class="text-xs font-bold text-emerald-600 ml-2 hover:underline">알바생 회원가입</button></div>
+             id="signupPrompt" class="mt-6 text-center space-y-2">
+                ><span class="text-xs text-slate-500">사장님이신가요?</span><button type="button" onclick="openSignupModal()" class="text-xs font-bold text-indigo-600 ml-2 hover:underline">가맹점 회원가입</button></div>
+                ><span class="text-xs text-slate-500">알바생이신가요?</span><button type="button" onclick="openStaffSignupModal()" class="text-xs font-bold text-emerald-600 ml-2 hover:underline">알바생 회원가입</button></div>
             </div>
         </div>
     </div>
@@ -248,6 +249,13 @@
         </header>
 
         <main class="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4 pb-24">
+            <main class="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4 pb-24">
+    
+    <!-- 실제 파일 선택 창은 숨겨두고, 예쁜 버튼으로 대신 클릭하게 만듦 -->
+<input type="file" id="excelUpload" accept=".xlsx, .xls" style="display: none;" onchange="handleExcelUpload(event)">
+<button onclick="document.getElementById('excelUpload').click()" style="padding: 10px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+  📊 엑셀로 상품 한방에 등록하기
+</button>
             
             <!-- [탭 1] 사장님 대시보드 -->
             <div id="tabContentDashboard" class="space-y-4 hidden">
@@ -489,7 +497,68 @@
             globalData[collectionKey] = dataObj;
             db.collection("easy_smart_stock").doc(collectionKey).set(dataObj).catch(e => console.error("DB 저장 에러:", e));
         }
+// 엑셀 업로드 처리 함수
+function handleExcelUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
+    // 로딩 알림
+    alert("엑셀 데이터를 읽고 있습니다. 잠시만 기다려주세요!");
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        // 엑셀 파일 읽기
+        const workbook = XLSX.read(data, {type: 'array'});
+        
+        // 네 파일에 있는 '03_상품마스터' 시트 찾기
+        const sheetName = workbook.SheetNames.find(name => name.includes('상품마스터')) || workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // 엑셀 데이터를 자바스크립트(JSON)로 쫙 변환 (2번째 줄부터 데이터 시작)
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: 1 }); 
+        
+        const newInventory = {};
+        
+        // 변환된 데이터를 우리 DB 입맛에 맞게 정리
+        jsonData.forEach(item => {
+            // '상품명' 항목이 있는 줄만 골라서 넣기
+            if(item['상품명']) {
+                const productName = item['상품명'];
+                newInventory[productName] = {
+                    category: item['상품군'] || '미분류',
+                    price: item['판매가_교육용'] || item['판매가'] || 0,
+                    cost: item['매입원가_교육용'] || item['매입원가'] || 0,
+                    stock: 0 // 처음에 올릴 때는 재고를 0으로 세팅
+                };
+            }
+        });
+        
+        if(Object.keys(newInventory).length === 0) {
+            return alert("엑셀에서 '상품명' 항목을 찾지 못했어! 양식을 확인해 줘.");
+        }
+
+        // 파이어베이스에 한 방에 밀어넣기 ({merge: true}로 기존 재고 안 날아가게 보호)
+        const db = firebase.firestore();
+        db.collection('easy_smart_stock').doc('inventory').set({
+            [currentLoggedInEmail]: newInventory
+        }, { merge: true })
+        .then(() => {
+            alert(`성공! 총 ${Object.keys(newInventory).length}개의 상품이 등록됐어!`);
+            // 여기에 화면 새로고침하는 함수를 넣으면 좋아! 
+            // 예: renderInventory(); 
+            location.reload(); // 일단 헷갈리면 화면 전체 강제 새로고침!
+        })
+        .catch(err => {
+            console.error("업로드 에러:", err);
+            alert("정보 저장 중 오류가 발생했어.");
+        });
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+
+        
         function getAIRecommendations(q) {
             const brands = {
                 "빵": ["삼립 정통 크림빵", "샤니 꿀호떡", "파리바게뜨 토스트식빵", "뚜레쥬르 옥수수식빵", "냉동 크로와상 생지(50입)", "업소용 햄버거번(30입)"],
