@@ -536,6 +536,7 @@ function handleExcelUpload(event) {
             // ★ 엑셀 5번째 줄(Row 5)이 실제 제목이므로 { range: 4 } 옵션 필수! (0부터 세서 4)
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: 4 });
             
+ const newInventory = {};
             // 변환된 데이터를 DB 입맛에 맞게 정리
             jsonData.forEach(item => {
                 if(item['상품명']) {
