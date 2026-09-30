@@ -1373,10 +1373,12 @@ function deleteSchedule() {
             const amtStr = prompt(action === 'add' ? "간편 입고 수량:" : action === 'sub' ? "간편 출고/폐기 수량:" : "변경 재고량:");
             if(amtStr === null) return; const amt = parseInt(amtStr, 10); if(isNaN(amt) || amt < 0) return;
 
-            let invMap = globalData.inventory || {};
           let invMap = globalData.inventory || {};
     let salesMap = globalData.sales || {};
+    
+    if (!invMap[targetEmail]) invMap[targetEmail] = {};
     let item = invMap[targetEmail][itemId];
+    if (!item) return; // 데이터 없으면 안전하게 차단
     
     // ★ 안전한 매출/비용 객체 초기화 (NaN 원천 차단!)
     if (!salesMap[targetEmail]) {
@@ -1388,7 +1390,7 @@ function deleteSchedule() {
     }
 
     if (action === 'add') {
-        item.stock += amt;
+        item.stock = (Number(item.stock) || 0) + amt;
         item.lastRestockDate = getLocalIsoDate();
         salesMap[targetEmail].orderExpense += (Number(item.cost || 0) * Number(amt));
     }
