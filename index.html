@@ -1973,33 +1973,48 @@ function directAdjustStock(itemId, action) {
         }
 
         function refreshDashboard() {
-            const salesMap = globalData.sales || {};
-            const invMap = globalData.inventory || {};
-            const usersMap = globalData.users || {};
-            const subsMap = globalData.subs || {};
-            const currentUser = usersMap[currentLoggedInEmail];
+        const salesMap = globalData.sales || {};
+        const invMap = globalData.inventory || {};
+        const usersMap = globalData.users || {};
+        const subsMap = globalData.subs || {};
+        const currentUser = usersMap[currentLoggedInEmail];
 
-            if (currentUser && currentUser.role === "owner") {
-                const mySale = salesMap[currentLoggedInEmail] || { history: [] };
-                let totalRev = 0; let totalOrder = 0; let totalWaste = 0;
-                if(mySale.history) { mySale.history.forEach(h => totalRev += h.rev); }
-                if(invMap[currentLoggedInEmail]) {
-                    Object.values(invMap[currentLoggedInEmail]).forEach(item => {
-                        totalOrder += (item.cost * (item.stock + item.totalSold)); 
-                    });
-                }
-                
-                document.getElementById("totalNetProfit").innerText = "₩ " + (totalRev - totalOrder - totalWaste).toLocaleString();
-                document.getElementById("totalRevenue").innerText = "₩ " + totalRev.toLocaleString();
-                document.getElementById("totalOrderExpense").innerText = "₩ " + totalOrder.toLocaleString();
-                
-                let tq=0, tr=0; const todayStr = getLocalIsoDate();
-                if (mySale.history) {
-                    mySale.history.forEach(h => {
-                        const recDate = h.date || todayStr;
-                        if(recDate === todayStr) { tq+=h.qty; tr+=h.rev; }
-                    });
-                }
+        if (currentUser && currentUser.role === "owner") {
+            const mySale = salesMap[currentLoggedInEmail] || { history: [] };
+            let totalRev = 0; let totalOrder = 0; let totalWaste = 0;
+            
+            if(mySale.history) { 
+                mySale.history.forEach(h => {
+                    totalRev += (Number(h.rev) || 0);
+                }); 
+            }
+            
+            if(invMap[currentLoggedInEmail]) {
+                Object.values(invMap[currentLoggedInEmail]).forEach(item => {
+                    const cost = Number(item.cost) || 0;
+                    const stock = Number(item.stock) || 0;
+                    const totalSold = Number(item.totalSold) || 0;
+                    totalOrder += (cost * (stock + totalSold)); 
+                });
+            }
+            
+            const netProfit = totalRev - totalOrder - totalWaste;
+            document.getElementById("totalNetProfit").innerText = "₩ " + (isNaN(netProfit) ? 0 : netProfit).toLocaleString();
+            document.getElementById("totalRevenue").innerText = "₩ " + totalRev.toLocaleString();
+            document.getElementById("totalOrderExpense").innerText = "₩ " + totalOrder.toLocaleString();
+            
+            let tq=0, tr=0; const todayStr = getLocalIsoDate();
+            if (mySale.history) {
+                mySale.history.forEach(h => {
+                    const recDate = h.date || todayStr;
+                    if(recDate === todayStr) { 
+                        tq += (Number(h.qty) || 0); 
+                        tr += (Number(h.rev) || 0); 
+                    }
+                });
+            }
+        }
+    }
                 document.getElementById("todaySoldSummaryText").innerText = `${tq.toLocaleString()}개 (₩${tr.toLocaleString()})`;
 
                 const isPro = subsMap[currentLoggedInEmail]?.active;
