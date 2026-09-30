@@ -910,7 +910,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (remember) localStorage.setItem("smart_stock_autologin_v64", JSON.stringify({ email, pw, role: selectedRole }));
           enterApp(usersData);
         }
-      }, 1000);
+      }, 3000);
     })
     .catch((error) => {
       alert("로그인 실패! 이메일과 비밀번호를 다시 확인해 줘.");
