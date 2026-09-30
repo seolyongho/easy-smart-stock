@@ -533,33 +533,32 @@ function handleExcelUpload(event) {
             const worksheet = workbook.Sheets[sheetName];
             
             // { range: 1 } 지움 (엑셀 첫 줄이 제목줄이므로 그대로 다 읽어야 함)
-            const jsonData = XLSX.utils.sheet_to_json(worksheet); 
+            // ★ 엑셀 5번째 줄(Row 5)이 실제 제목이므로 { range: 4 } 옵션 필수! (0부터 세서 4)
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: 4 });
             
-            const newInventory = {};
-            
-          // 변환된 데이터를 DB 입맛에 맞게 정리 (엑셀 데이터 완벽 흡수!)
+            // 변환된 데이터를 DB 입맛에 맞게 정리
             jsonData.forEach(item => {
                 if(item['상품명']) {
                     const productName = item['상품명'];
                     newInventory[productName] = {
                         name: productName,
                         category: item['상품군'] || '미분류',
-                        price: item['판매가_교육용'] || item['판매가'] || 0,
-                        cost: item['매입원가_교육용'] || item['매입원가'] || 0,
+                        price: item['판매가'] || item['판매가_교육용'] || 0,
+                        cost: item['매입원가'] || item['매입원가_교육용'] || 0,
                         
-                        // 👇 네가 말한 엑셀 데이터 싹 다 가져오는 부분!
-                        stock: item['재고'] || item['현재고'] || item['재고수량'] || 0,           // 재고 개수
-                        salesQty: item['판매수량'] || item['판매량'] || 0,                         // 판매수량
-                        avgEndStock: item['평균 기말재고'] || item['기말재고'] || 0,                // 평균 기말재고
-                        outOfStockDays: item['품절일수'] || item['품절 일수'] || 0,               // 품절일수
-                        outOfStockQty: item['품절수량'] || item['품절 수량'] || 0,                // 품절수량
-                        disposalDays: item['폐기일수'] || item['폐기 일수'] || 0,                 // 폐기 일수
-                        disposalQty: item['폐기수량'] || item['폐기 수량'] || 0,                  // 폐기 수량
-                        salesProfit: item['판매이익'] || item['판매 이익'] || 0,                  // 판매 이익
-                        disposalLoss: item['폐기손실'] || item['폐기 손실'] || 0,                 // 폐기 손실
-                        outOfStockLoss: item['품절손실'] || item['품절 손실'] || 0,               // 품절 손실
-                        inventoryCost: item['재고관리비용'] || item['재고관리 비용'] || 0,          // 재고관리 비용
-                        netProfit: item['순이익'] || 0                                         // 순이익
+                        // 👇 엑셀 글자(띄어쓰기 없음) 완벽 매칭!
+                        stock: Math.round(item['평균기말재고']) || 0,  // 현재고가 없어서 평균기말재고를 초기 재고로 세팅!
+                        salesQty: item['판매수량'] || 0,
+                        avgEndStock: item['평균기말재고'] || 0,
+                        outOfStockDays: item['품절일수'] || 0,
+                        outOfStockQty: item['품절수량'] || 0,
+                        disposalDays: item['폐기일수'] || 0,
+                        disposalQty: item['폐기수량'] || 0,
+                        salesProfit: item['판매이익'] || 0,
+                        disposalLoss: item['폐기손실'] || 0,
+                        outOfStockLoss: item['품절손실'] || 0,
+                        inventoryCost: item['재고관리비용'] || 0,
+                        netProfit: item['순이익'] || 0
                     };
                 }
             });
