@@ -1374,14 +1374,24 @@ function deleteSchedule() {
             if(amtStr === null) return; const amt = parseInt(amtStr, 10); if(isNaN(amt) || amt < 0) return;
 
             let invMap = globalData.inventory || {};
-            let salesMap = globalData.sales || {};
-            let item = invMap[targetEmail][itemId];
+          let invMap = globalData.inventory || {};
+    let salesMap = globalData.sales || {};
+    let item = invMap[targetEmail][itemId];
+    
+    // ★ 안전한 매출/비용 객체 초기화 (NaN 원천 차단!)
+    if (!salesMap[targetEmail]) {
+        salesMap[targetEmail] = { revenue: 0, orderExpense: 0, wasteExpense: 0 };
+    } else {
+        salesMap[targetEmail].revenue = Number(salesMap[targetEmail].revenue) || 0;
+        salesMap[targetEmail].orderExpense = Number(salesMap[targetEmail].orderExpense) || 0;
+        salesMap[targetEmail].wasteExpense = Number(salesMap[targetEmail].wasteExpense) || 0;
+    }
 
-            if(action === 'add') { 
-                item.stock += amt; 
-                item.lastRestockDate = getLocalIsoDate();
-                salesMap[targetEmail].orderExpense += (item.cost * amt); 
-            }
+    if (action === 'add') {
+        item.stock += amt;
+        item.lastRestockDate = getLocalIsoDate();
+        salesMap[targetEmail].orderExpense += (Number(item.cost || 0) * Number(amt));
+    }
             else if(action === 'sub') { if(item.stock < amt) return alert("재고 부족"); item.stock -= amt; }
             else { item.stock = amt; }
 
