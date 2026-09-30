@@ -2089,6 +2089,20 @@ function deleteSchedule() {
         alert("성공적으로 수정되었습니다!");
         renderMyInventory();
     }
+        // ★ 내 가게 등록된 재고 찾는 전용 검색 엔진
+    function searchMyInventory() {
+        const keyword = document.getElementById("myStockSearchInput") ? document.getElementById("myStockSearchInput").value.toLowerCase() : "";
+        const cards = document.querySelectorAll(".product-card-item");
+        
+        cards.forEach(card => {
+            const name = card.getAttribute("data-name") ? card.getAttribute("data-name").toLowerCase() : "";
+            if (name.includes(keyword)) {
+                card.style.display = "block"; // 검색어와 일치하면 보여주기
+            } else {
+                card.style.display = "none";  // 아니면 숨기기
+            }
+        });
+    }
     </script>
 </body>
 </html>
