@@ -1972,18 +1972,21 @@ function directAdjustStock(itemId, action) {
             closeSubscriptionModal(); refreshDashboard(); alert("🎉 PRO 멤버십 결제가 완료되었습니다!");
         }
 
-      function refreshDashboard() {
-    const salesMap = globalData.sales || {};
-    const invMap = globalData.inventory || {};
-    const usersMap = globalData.users || {};
-    const subsMap = globalData.subs || {};
-    const currentUser = usersMap[currentLoggedInEmail];
+     function refreshDashboard() {
+    try {
+        const salesMap = globalData.sales || {};
+        const invMap = globalData.inventory || {};
+        const usersMap = globalData.users || {};
+        const currentUser = usersMap[currentLoggedInEmail];
 
-    if (currentUser && currentUser.role === "owner") {
+        if (!currentUser || currentUser.role !== "owner") return;
+
         const mySale = salesMap[currentLoggedInEmail] || { history: [] };
-        let totalRev = 0; let totalOrder = 0; let totalWaste = 0;
+        let totalRev = 0; 
+        let totalOrder = 0; 
+        let totalWaste = 0;
         
-        if (mySale.history) { 
+        if (mySale.history && Array.isArray(mySale.history)) { 
             mySale.history.forEach(h => {
                 totalRev += (Number(h.rev) || 0);
             }); 
@@ -2011,7 +2014,7 @@ function directAdjustStock(itemId, action) {
         
         let tq = 0, tr = 0; 
         const todayStr = getLocalIsoDate();
-        if (mySale.history) {
+        if (mySale.history && Array.isArray(mySale.history)) {
             mySale.history.forEach(h => {
                 const recDate = h.date || todayStr;
                 if (recDate === todayStr) { 
@@ -2025,6 +2028,8 @@ function directAdjustStock(itemId, action) {
         if (summaryTextEl) {
             summaryTextEl.innerText = `수량: ${tq.toLocaleString()}개 / 매출: ₩ ${tr.toLocaleString()}`;
         }
+    } catch (err) {
+        console.error("refreshDashboard error:", err);
     }
 }
                 const isPro = subsMap[currentLoggedInEmail]?.active;
