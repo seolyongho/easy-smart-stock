@@ -528,17 +528,24 @@ function handleExcelUpload(event) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
             
-            // '03_상품마스터' 시트 찾기
-            const sheetName = workbook.SheetNames.find(name => name.includes('상품마스터')) || workbook.SheetNames[0];
+           // ★ 1. 시트 자동 선택 ('요약'이나 '마스터' 시트를 우선으로 찾음)
+            const sheetName = workbook.SheetNames.find(name => name.includes('요약') || name.includes('마스터')) || workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            
-            // { range: 1 } 지움 (엑셀 첫 줄이 제목줄이므로 그대로 다 읽어야 함)
-            // ★ 엑셀 5번째 줄(Row 5)이 실제 제목이므로 { range: 4 } 옵션 필수! (0부터 세서 4)
-           // ★ 엑셀 5번째 줄(Row 5)이 실제 제목이므로 { range: 4 } 옵션 필수!
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: 4 });
-            
-            const newInventory = {}; // 
-            
+
+            // ★ 2. 💡 마법의 코드: '상품명'이 도대체 몇 번째 줄에 있는지 AI처럼 자동 탐색!
+            const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); 
+            let headerIdx = 0;
+            for (let i = 0; i < 15; i++) {
+                if (rawData[i] && rawData[i].includes('상품명')) {
+                    headerIdx = i; // '상품명'이 있는 줄 번호 획득!
+                    break;
+                }
+            }
+
+            // ★ 3. 찾은 줄 번호부터 데이터만 쏙쏙 뽑아오기
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: headerIdx });
+            const newInventory = {}; // 👈 에러 났던 빈 바구니 안전하게 세팅!
+
             // 변환된 데이터를 DB 입맛에 맞게 정리
             jsonData.forEach(item => {
                 if(item['상품명']) {
@@ -549,7 +556,6 @@ function handleExcelUpload(event) {
                         price: item['판매가'] || item['판매가_교육용'] || 0,
                         cost: item['매입원가'] || item['매입원가_교육용'] || 0,
                         
-                        // 👇 엑셀 글자 완벽 매칭
                         stock: Math.round(item['평균기말재고']) || 0,
                         salesQty: item['판매수량'] || 0,
                         avgEndStock: item['평균기말재고'] || 0,
