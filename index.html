@@ -1790,56 +1790,60 @@ function deleteSchedule() {
         // ==========================================
         // ★ 관리자(본사) 관제탑 패널 (직영점/가맹점 분리 적용)
         // ==========================================
-        function renderAdminDashboard() {
-            const users = globalData.users || {};
-            const allSales = globalData.sales || {};
-            const directContainer = document.getElementById("adminDirectStores");
-            const normalContainer = document.getElementById("adminNormalStores");
-            
-            directContainer.innerHTML = "";
-            normalContainer.innerHTML = "";
-            
-            let directCount = 0;
-            let normalCount = 0;
-            
-            for (let id in users) {
-                if (users[id].role === "owner") {
-                    const u = users[id];
-                    const sale = allSales[id] || { revenue: 0, orderExpense: 0, wasteExpense: 0 };
-                    const net = sale.revenue - sale.orderExpense - sale.wasteExpense;
-                    const isDirect = u.isDirectStore;
-                    
-                    const cardHTML = `
-                        <div class="p-4 border rounded-2xl ${isDirect ? 'bg-indigo-50 border-indigo-200' : 'bg-white shadow-2xs'} space-y-2 text-xs mb-3">
-                            <div class="flex justify-between items-center border-b ${isDirect ? 'border-indigo-100' : 'border-slate-100'} pb-2 mb-2">
-                                <b class="text-sm ${isDirect ? 'text-indigo-900' : 'text-slate-900'}">${u.name}</b> 
-                                <span class="bg-indigo-50 text-indigo-600 font-bold px-2 py-1 rounded-lg border border-indigo-100">코드: ${u.storeCode}</span>
-                            </div>
-                            <p class="${isDirect ? 'text-indigo-700' : 'text-slate-500'}">대표: ${u.ownerName} | ${u.phone} | 업종: ${u.businessType}</p>
-                            <div class="${isDirect ? 'bg-white' : 'bg-slate-50'} p-2 rounded-xl grid grid-cols-2 gap-2 text-center mt-2 border ${isDirect ? 'border-indigo-100' : 'border-transparent'}">
-                                <div><span class="block text-[10px] text-slate-400">총매출</span><b class="text-slate-800">₩${sale.revenue.toLocaleString()}</b></div>
-                                <div><span class="block text-[10px] text-slate-400">순수익</span><b class="text-emerald-600">₩${net.toLocaleString()}</b></div>
-                            </div>
-                            <div class="flex gap-2 pt-2">
-                                <button onclick="openStoreInventory('${id}')" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl font-bold shadow hover:bg-indigo-700 transition">장부/재고 관리</button>
-                                <button onclick="toggleDirectStore('${id}')" class="flex-1 ${isDirect ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-700'} py-2 rounded-xl font-bold shadow-sm transition">${isDirect ? '일반매장 변경' : '직영매장 설정'}</button>
-                                <button onclick="deleteUser('${id}')" class="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl border border-rose-100 font-bold hover:bg-rose-100 transition"><i class="fa-solid fa-trash"></i></button>
-                            </div>
+       function renderAdminDashboard() {
+        const users = globalData.users || {};
+        const allSales = globalData.sales || {};
+        const directContainer = document.getElementById("adminDirectStores");
+        const normalContainer = document.getElementById("adminNormalStores");
+        
+        if (directContainer) directContainer.innerHTML = "";
+        if (normalContainer) normalContainer.innerHTML = "";
+
+        let directCount = 0;
+        let normalCount = 0;
+
+        for (let id in users) {
+            if (users[id].role === "owner") {
+                const u = users[id];
+                // ★ NaN 방지를 위해 숫자가 없으면 무조건 0으로 안전하게 세팅
+                const rawSale = allSales[id] || { revenue: 0, orderExpense: 0, wasteExpense: 0 };
+                const revenue = Number(rawSale.revenue) || 0;
+                const orderExpense = Number(rawSale.orderExpense) || 0;
+                const wasteExpense = Number(rawSale.wasteExpense) || 0;
+                const net = revenue - orderExpense - wasteExpense;
+                
+                const isDirect = u.isDirectoryStore;
+
+                const cardHTML = `
+                <div class="p-4 border rounded-2xl ${isDirect ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200'} space-y-3 text-xs shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <b class="text-sm text-slate-900">${u.name}</b> 
+                            <span class="text-[10px] text-slate-400 ml-1">(${u.storeCode || '코드없음'})</span>
                         </div>
-                    `;
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isDirect ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}">
+                            ${isDirect ? '직영점' : '가맹점'}
+                        </span>
+                    </div>
                     
-                    if (isDirect) {
-                        directContainer.innerHTML += cardHTML;
-                        directCount++;
-                    } else {
-                        normalContainer.innerHTML += cardHTML;
-                        normalCount++;
-                    }
+                    <div class="bg-white/80 p-2.5 rounded-xl border border-slate-200 grid grid-cols-2 gap-2 text-[10px]">
+                        <div class="flex flex-col text-slate-600"><span>💰 오늘 판매(매출)</span> <b class="text-sm text-slate-900">₩${revenue.toLocaleString()}</b></div>
+                        <div class="flex flex-col text-slate-600"><span>📦 발주 비용</span> <b class="text-sm text-slate-900">₩${orderExpense.toLocaleString()}</b></div>
+                        <div class="flex flex-col text-rose-500"><span>🗑️ 폐기 비용</span> <b>₩${wasteExpense.toLocaleString()}</b></div>
+                        <div class="flex flex-col text-indigo-600"><span>✨ 실질 순수익</span> <b class="text-sm">₩${net.toLocaleString()}</b></div>
+                    </div>
+                </div>`;
+
+                if (isDirect) {
+                    if (directContainer) directContainer.innerHTML += cardHTML;
+                    directCount++;
+                } else {
+                    if (normalContainer) normalContainer.innerHTML += cardHTML;
+                    normalCount++;
                 }
             }
-            if(directCount === 0) directContainer.innerHTML = `<p class="text-center text-slate-400 py-4 text-xs">설정된 본사 직영 매장이 없습니다.</p>`;
-            if(normalCount === 0) normalContainer.innerHTML = `<p class="text-center text-slate-400 py-4 text-xs">등록된 일반 가맹점이 없습니다.</p>`;
         }
+    }
 
         // 직영 매장 <-> 일반 가맹점 토글 함수
         function toggleDirectStore(id) {
