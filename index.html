@@ -1715,9 +1715,13 @@ function deleteSchedule() {
         const invMap = globalData.inventory || {};
         const myInv = invMap[currentLoggedInEmail] || {};
         const c = document.getElementById("myInventoryList");
+        if (!c) return;
         
-        // ★ 최상단에 '전체 선택' 및 '선택 삭제' 메뉴 바 추가
+        // ★ 내 가게 등록된 재고 검색 전용 미니 검색창 + 전체 선택 바
         c.innerHTML = `
+        <div class="mb-4">
+            <input type="text" id="myStockSearchInput" onkeyup="searchMyInventory()" placeholder="🔍 내 가게 등록된 재고 검색... (예: 삼각김밥, 도시락)" class="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold focus:outline-indigo-600 shadow-sm text-slate-800 bg-slate-50">
+        </div>
         <div class="flex justify-between items-center bg-slate-100 p-2.5 rounded-xl mb-4 shadow-sm border border-slate-200">
             <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
                 <input type="checkbox" onchange="toggleAll(this)" class="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500"> 
@@ -1731,20 +1735,15 @@ function deleteSchedule() {
         let has = false;
         for (let k in myInv) {
             has = true; const item = myInv[k]; const so = calculateSmartOrder(item);
-            let badge = item.stock === 0 ? `<span class="bg-rose-100 text-rose-600 px-2 py-0.5 rounded font-extrabold">🚨 품절</span>` :
-                        item.stock < so.effectiveDaily * 3 ? `<span class="bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold">⚠️ 임박</span>` :
-                        `<span class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-bold">✅ 여유</span>`;
 
             c.innerHTML += `
-            <div class="p-4 border rounded-2xl bg-white space-y-3 text-xs shadow-sm relative">
-                <!-- ★ 개별 체크박스 -->
+            <div class="product-card-item p-4 border rounded-2xl bg-white space-y-3 text-xs shadow-sm relative" data-name="${item.name}">
                 <input type="checkbox" class="product-chk absolute top-4 right-4 w-5 h-5 cursor-pointer" value="${k}">
                 
                 <div class="flex justify-between items-center pr-8">
                     <div><b class="text-sm text-slate-900">${item.name}</b> <span class="text-[10px] text-slate-400 ml-1">단가 ₩${(item.price||0).toLocaleString()}</span></div>
                 </div>
                 
-                <!-- 대시보드 -->
                 <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-200 grid grid-cols-3 gap-2 text-[10px] my-2">
                     <div class="flex flex-col text-slate-600"><span>📦 현재고</span> <b class="text-sm text-slate-900">${item.stock || 0}개</b></div>
                     <div class="flex flex-col text-slate-600"><span>📈 판매수량</span> <b class="text-slate-900">${item.salesQty || 0}개</b></div>
@@ -1767,7 +1766,6 @@ function deleteSchedule() {
                     <button onclick="directAdjustStock('${k}', 'add')" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-extrabold text-base hover:bg-slate-200">+</button>
                     
                     <div class="flex-1 flex justify-end gap-1">
-                        <!-- ★ 데이터 수정 버튼 추가 -->
                         <button onclick="openDataEditModal('${k}')" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm text-[10px]">✏️수정</button>
                         <button onclick="openBatchSaleModal('${k}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm text-[10px]">💰정산</button>
                         <button onclick="deleteProduct('${k}')" class="bg-rose-50 text-rose-600 font-bold px-2.5 py-1.5 rounded-lg border border-rose-200 shadow-sm text-[10px]">삭제</button>
@@ -1776,7 +1774,7 @@ function deleteSchedule() {
             </div>`;
         }
         if (!has) c.innerHTML = '<p class="text-slate-400 text-center py-6">보유 중인 상품이 없습니다.</p>';
-        renderBestSellers(myInv);
+        if (typeof renderBestSellers === 'function') renderBestSellers(myInv);
     }
 
         // ==========================================
