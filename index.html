@@ -536,16 +536,29 @@ function handleExcelUpload(event) {
             
             const newInventory = {};
             
-          // 변환된 데이터를 DB 입맛에 맞게 정리
+          // 변환된 데이터를 DB 입맛에 맞게 정리 (엑셀 데이터 완벽 흡수!)
             jsonData.forEach(item => {
                 if(item['상품명']) {
                     const productName = item['상품명'];
                     newInventory[productName] = {
-                        name: productName, // 👈 여기에 상품명 명찰을 달아줬어!
+                        name: productName,
                         category: item['상품군'] || '미분류',
                         price: item['판매가_교육용'] || item['판매가'] || 0,
                         cost: item['매입원가_교육용'] || item['매입원가'] || 0,
-                        stock: 0 // 기본 재고는 0
+                        
+                        // 👇 네가 말한 엑셀 데이터 싹 다 가져오는 부분!
+                        stock: item['재고'] || item['현재고'] || item['재고수량'] || 0,           // 재고 개수
+                        salesQty: item['판매수량'] || item['판매량'] || 0,                         // 판매수량
+                        avgEndStock: item['평균 기말재고'] || item['기말재고'] || 0,                // 평균 기말재고
+                        outOfStockDays: item['품절일수'] || item['품절 일수'] || 0,               // 품절일수
+                        outOfStockQty: item['품절수량'] || item['품절 수량'] || 0,                // 품절수량
+                        disposalDays: item['폐기일수'] || item['폐기 일수'] || 0,                 // 폐기 일수
+                        disposalQty: item['폐기수량'] || item['폐기 수량'] || 0,                  // 폐기 수량
+                        salesProfit: item['판매이익'] || item['판매 이익'] || 0,                  // 판매 이익
+                        disposalLoss: item['폐기손실'] || item['폐기 손실'] || 0,                 // 폐기 손실
+                        outOfStockLoss: item['품절손실'] || item['품절 손실'] || 0,               // 품절 손실
+                        inventoryCost: item['재고관리비용'] || item['재고관리 비용'] || 0,          // 재고관리 비용
+                        netProfit: item['순이익'] || 0                                         // 순이익
                     };
                 }
             });
