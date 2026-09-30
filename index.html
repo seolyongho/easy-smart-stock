@@ -1368,12 +1368,11 @@ function deleteSchedule() {
             saveToDB('inventory', invMap);
         }
 
- function directAdjustStock(itemId, action) {
+function directAdjustStock(itemId, action) {
         const targetEmail = (selectedRole === 'admin' && currentAdminModalUserId) ? currentAdminModalUserId : currentLoggedInEmail;
         const amtStr = prompt(action === 'add' ? "간편 입고 수량:" : action === 'sub' ? "간편 출고/폐기 수량:" : "변경 재고량:");
         if (amtStr === null) return;
         
-        // ★ 숫자로 안전하게 변환 (NaN 원천 차단)
         const amt = parseInt(amtStr, 10);
         if (isNaN(amt) || amt < 0) {
             alert("올바른 숫자를 입력해주세요!");
@@ -1387,7 +1386,6 @@ function deleteSchedule() {
         let item = invMap[targetEmail][itemId];
         if (!item) return;
 
-        // ★ 매출/비용 객체 안전 초기화
         if (!salesMap[targetEmail]) {
             salesMap[targetEmail] = { revenue: 0, orderExpense: 0, wasteExpense: 0 };
         } else {
@@ -1403,6 +1401,20 @@ function deleteSchedule() {
         } else if (action === 'sub') {
             if ((Number(item.stock) || 0) < amt) {
                 alert("재고가 부족합니다!");
+                return;
+            }
+            item.stock -= amt;
+        } else {
+            item.stock = amt;
+        }
+
+        invMap[targetEmail][itemId] = item;
+        saveToDB('inventory', invMap);
+        saveToDB('sales', salesMap);
+
+        if (selectedRole === 'admin') openStoreInventory(targetEmail);
+        else refreshDashboard();
+    }
                
 
         function directSetStock(id, valStr) {
