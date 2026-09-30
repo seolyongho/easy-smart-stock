@@ -536,11 +536,12 @@ function handleExcelUpload(event) {
             
             const newInventory = {};
             
-            // 변환된 데이터를 DB 입맛에 맞게 정리
+          // 변환된 데이터를 DB 입맛에 맞게 정리
             jsonData.forEach(item => {
                 if(item['상품명']) {
                     const productName = item['상품명'];
                     newInventory[productName] = {
+                        name: productName, // 👈 여기에 상품명 명찰을 달아줬어!
                         category: item['상품군'] || '미분류',
                         price: item['판매가_교육용'] || item['판매가'] || 0,
                         cost: item['매입원가_교육용'] || item['매입원가'] || 0,
