@@ -1977,6 +1977,7 @@ function directAdjustStock(itemId, action) {
         const salesMap = globalData.sales || {};
         const invMap = globalData.inventory || {};
         const usersMap = globalData.users || {};
+        const subsMap = globalData.subs || {};
         const currentUser = usersMap[currentLoggedInEmail];
 
         if (!currentUser || currentUser.role !== "owner") return;
@@ -2013,25 +2014,39 @@ function directAdjustStock(itemId, action) {
         if (orderEl) orderEl.innerText = "₩ " + totalOrder.toLocaleString();
         
         let tq = 0, tr = 0; 
+        const todayStr = getLocalIsoDate();
+        if (mySale.history && Array.isArray(mySale.history)) {
+            mySale.history.forEach(h => {
+                const recDate = h.date || todayStr;
+                if (recDate === todayStr) { 
+                    tq += (Number(h.qty) || 0); 
+                    tr += (Number(h.rev) || 0); 
+                }
+            });
+        }
+        
         const summaryTextEl = document.getElementById("todaysoldsummaryText");
-    if (summaryTextEl) {
-        summaryTextEl.innerText = `수량: ${tq.toLocaleString()}개 / 매출: ₩ ${tr.toLocaleString()}`;
-    }
+        if (summaryTextEl) {
+            summaryTextEl.innerText = `수량: ${tq.toLocaleString()}개 / 매출: ₩ ${tr.toLocaleString()}`;
+        }
 
-    const isPro = subsMap[currentLoggedInEmail]?.active;
-    const proPitchBanner = document.getElementById("proPitchBanner");
-    if (isPro) {
-        if (proPitchBanner) proPitchBanner.classList.add("hidden");
-    } else {
-        if (proPitchBanner) proPitchBanner.classList.remove("hidden");
-    }
+        const isPro = subsMap[currentLoggedInEmail]?.active;
+        const proPitchBanner = document.getElementById("proPitchBanner");
+        if (isPro) {
+            if (proPitchBanner) proPitchBanner.classList.add("hidden");
+        } else {
+            if (proPitchBanner) proPitchBanner.classList.remove("hidden");
+        }
 
-    renderMyInventory();
-    renderWeekdayStats();
-    if (!document.getElementById("tabContentStats").classList.contains("hidden")) {
-        renderDailyDetailedStats();
-        renderMonthlyItemStats();
-        renderWeekdayItemStats();
+        renderMyInventory();
+        renderWeekdayStats();
+        if (!document.getElementById("tabContentStats").classList.contains("hidden")) {
+            renderDailyDetailedStats();
+            renderMonthlyItemStats();
+            renderWeekdayItemStats();
+        }
+    } catch (err) {
+        console.error("refreshDashboard error:", err);
     }
 }
         
