@@ -473,8 +473,11 @@
             </div>
         </main>
 
-        <!-- 하단 탭 바 (사장님 전용) -->
-        <nav class="bg-white border-t flex justify-around py-3 shrink-0 z-30 shadow-lg" id="mobileBottomNav">
+      <!-- ★ 스크롤 끝까지 내렸을 때 마지막 상품이 메뉴에 안 가려지게 빈 공간 추가 -->
+        <div class="h-24 w-full shrink-0"></div>
+
+        <!-- ★ 하단 탭 바 (스마트폰 앱처럼 화면 맨 아래에 딱 고정!) -->
+        <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 flex justify-around py-3 z-[100] shadow-[0_-5px_20px_rgba(0,0,0,0.1)]" id="mobileBottomNav">
             <button onclick="switchTab('dashboard')" id="navBtnDashboard" class="flex flex-col items-center text-indigo-600 font-bold text-xs"><i class="fa-solid fa-chart-pie text-xl mb-0.5"></i>대시보드</button>
             <button onclick="switchTab('stock')" id="navBtnStock" class="flex flex-col items-center text-slate-400 font-semibold text-xs"><i class="fa-solid fa-boxes-stacked text-xl mb-0.5"></i>재고/입출고</button>
             <button onclick="switchTab('staffManage')" id="navBtnStaffManage" class="flex flex-col items-center text-slate-400 font-semibold text-xs"><i class="fa-solid fa-users-gear text-xl mb-0.5"></i>알바관리</button>
