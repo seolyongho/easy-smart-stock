@@ -29,7 +29,7 @@ self.addEventListener('activate', event => {
             );
         })
     );
-    self.client.claim();
+    self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
