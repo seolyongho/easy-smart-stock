@@ -534,9 +534,11 @@ function handleExcelUpload(event) {
             
             // { range: 1 } 지움 (엑셀 첫 줄이 제목줄이므로 그대로 다 읽어야 함)
             // ★ 엑셀 5번째 줄(Row 5)이 실제 제목이므로 { range: 4 } 옵션 필수! (0부터 세서 4)
+           // ★ 엑셀 5번째 줄(Row 5)이 실제 제목이므로 { range: 4 } 옵션 필수!
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: 4 });
             
- const newInventory = {};
+            const newInventory = {}; // 
+            
             // 변환된 데이터를 DB 입맛에 맞게 정리
             jsonData.forEach(item => {
                 if(item['상품명']) {
@@ -547,8 +549,8 @@ function handleExcelUpload(event) {
                         price: item['판매가'] || item['판매가_교육용'] || 0,
                         cost: item['매입원가'] || item['매입원가_교육용'] || 0,
                         
-                        // 👇 엑셀 글자(띄어쓰기 없음) 완벽 매칭!
-                        stock: Math.round(item['평균기말재고']) || 0,  // 현재고가 없어서 평균기말재고를 초기 재고로 세팅!
+                        // 👇 엑셀 글자 완벽 매칭
+                        stock: Math.round(item['평균기말재고']) || 0,
                         salesQty: item['판매수량'] || 0,
                         avgEndStock: item['평균기말재고'] || 0,
                         outOfStockDays: item['품절일수'] || 0,
