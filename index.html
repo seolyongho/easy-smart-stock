@@ -547,30 +547,40 @@ function handleExcelUpload(event) {
 
             // ★ 3. 찾은 줄 번호부터 데이터만 쏙쏙 뽑아오기
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: headerIdx });
-            const newInventory = {}; // 👈 에러 났던 빈 바구니 안전하게 세팅!
+           const newInventory = {}; // 👈 에러 났던 빈 바구니 안전하게 세팅!
 
-            // 변환된 데이터를 DB 입맛에 맞게 정리
+            // 변환된 데이터를 DB 입맛에 맞게 정리 (NaN 방지를 위해 Number로 확실하게 변환!)
             jsonData.forEach(item => {
                 if(item['상품명']) {
                     const productName = item['상품명'];
+                    
+                    // 숫자로 안전하게 바꾸는 헬퍼 함수
+                    const parseNum = (val) => {
+                        if (typeof val === 'number') return val;
+                        if (!val) return 0;
+                        const cleaned = String(val).replace(/[^0-9.-]+/g, ""); // ₩, 콤마 등 문자 제거
+                        const num = parseFloat(cleaned);
+                        return isNaN(num) ? 0 : num;
+                    };
+
                     newInventory[productName] = {
                         name: productName,
                         category: item['상품군'] || '미분류',
-                        price: item['판매가'] || item['판매가_교육용'] || 0,
-                        cost: item['매입원가'] || item['매입원가_교육용'] || 0,
+                        price: parseNum(item['판매가'] || item['판매가_교육용']),
+                        cost: parseNum(item['매입원가'] || item['매입원가_교육용']),
                         
-                        stock: Math.round(item['평균기말재고']) || 0,
-                        salesQty: item['판매수량'] || 0,
-                        avgEndStock: item['평균기말재고'] || 0,
-                        outOfStockDays: item['품절일수'] || 0,
-                        outOfStockQty: item['품절수량'] || 0,
-                        disposalDays: item['폐기일수'] || 0,
-                        disposalQty: item['폐기수량'] || 0,
-                        salesProfit: item['판매이익'] || 0,
-                        disposalLoss: item['폐기손실'] || 0,
-                        outOfStockLoss: item['품절손실'] || 0,
-                        inventoryCost: item['재고관리비용'] || 0,
-                        netProfit: item['순이익'] || 0
+                        stock: Math.round(parseNum(item['평균기말재고'])),
+                        salesQty: parseNum(item['판매수량']),
+                        avgEndStock: parseNum(item['평균기말재고']),
+                        outOfStockDays: parseNum(item['품절일수']),
+                        outOfStockQty: parseNum(item['품절수량']),
+                        disposalDays: parseNum(item['폐기일수']),
+                        disposalQty: parseNum(item['폐기수량']),
+                        salesProfit: parseNum(item['판매이익']),
+                        disposalLoss: parseNum(item['폐기손실']),
+                        outOfStockLoss: parseNum(item['품절손실']),
+                        inventoryCost: parseNum(item['재고관리비용']),
+                        netProfit: parseNum(item['순이익'])
                     };
                 }
             });
